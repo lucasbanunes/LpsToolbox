@@ -13,7 +13,6 @@ from keras.utils import to_categorical
 
 import numpy as np
 
-
 def spIndex(y_true, y_pred):
     """Sum-Product Index Score
 
@@ -29,6 +28,7 @@ def spIndex(y_true, y_pred):
     sp : float
     """
 
+    # TODO pass this checking to an auxiliary function
     if isinstance(y_true, np.ndarray) and isinstance(y_pred, np.ndarray):
         if y_true.ndim == 1: # turn 1d array to sparse matrix
             y_true = to_categorical(y_true, np.unique(y_true).shape[0])
@@ -59,7 +59,7 @@ def spIndex(y_true, y_pred):
 def recall_score(y_true, y_pred, average=None):
     # TODO implement tensorflow version
 
-    recall = sklearn.metrics.recall_score(trgt, model_output, average=average)
+    recall = sklearn.metrics.recall_score(y_true, y_pred, average=average)
     return recall
 
 
