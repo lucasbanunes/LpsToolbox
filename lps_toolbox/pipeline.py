@@ -8,8 +8,19 @@ from sklearn.utils.metaestimators import if_delegate_has_method
 from sklearn.utils import Bunch
 from sklearn.utils.validation import check_memory
 
+def _fit_transform_one(transformer, X, y, weight, **fit_params):
+    print X.shape
+    print y.shape
+    if hasattr(transformer, 'fit_transform'):
+        res, yt = transformer.fit_transform(X, y, **fit_params)
+    else:
+        res, yt = transformer.fit(X, y, **fit_params).transform(X)
+    # if we have a weight for this transformer, multiply output
+    if weight is None:
+        return res, yt, transformer
+    return res * weight, yt, transformer
 
-class ExtenedPipeline(Pipeline):
+class ExtendedPipeline(Pipeline):
     """Extends Pipeline object to handle transformers that returns both X and y values
     from fit and transform methods
     For more information on the original object and its functionalities,
@@ -437,11 +448,11 @@ class ExtenedPipeline(Pipeline):
         Xt = X
         for name, transform in self.steps[:-1]:
             if transform is not None:
-                Xt = transform.transform(Xt)
+                Xt, yt = transform.transform(Xt)
         score_params = {}
         if sample_weight is not None:
             score_params['sample_weight'] = sample_weight
-        return self.steps[-1][-1].score(Xt, y, **score_params)
+        return self.steps[-1][-1].score(Xt, yt, **score_params)
 
     @property
     def classes_(self):

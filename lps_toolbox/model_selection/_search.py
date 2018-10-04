@@ -97,7 +97,7 @@ class PersGridSearchCV(BaseSearchCV):
                                     return_n_test_samples=True,
                                     return_times=True,
                                     return_parameters=False,
-                                    return_estimator=True,
+                                    return_estimator=False,
                                     error_score=self.error_score,
                                     verbose=self.verbose)
         results_container = [{}]
@@ -125,6 +125,9 @@ class PersGridSearchCV(BaseSearchCV):
                         warnings.warn('Estimator does not have recovery '
                                       ' or saving capabilities')
                     print parameters
+                    print i_fold
+
+
                     return delayed(_fit_and_score)(current_estimator,
                                                     X, y,
                                                     train=train, test=test,
@@ -136,6 +139,9 @@ class PersGridSearchCV(BaseSearchCV):
                     print("Fitting {0} folds for each of {1} candidates,"
                           " totalling {2} fits".format(
                         n_splits, n_candidates, n_candidates * n_splits))
+
+                # print list(candidate_params)
+                # raise NotImplementedError
                 out = parallel(_fit_and_score_recv(i_fold,
                                                    X, y,
                                                    train, test,
@@ -144,8 +150,8 @@ class PersGridSearchCV(BaseSearchCV):
                                in product(candidate_params,
                                           list_split))
 
-                all_estimators.extend([out_set[-1] for out_set in out])
-                out = [out_set[:-1] for out_set in out]
+                #all_estimators.extend([out_set[-1] for out_set in out])
+                #out = [out_set[:-1] for out_set in out]
                 all_candidate_params.extend(candidate_params)
                 all_out.extend(out)
 
