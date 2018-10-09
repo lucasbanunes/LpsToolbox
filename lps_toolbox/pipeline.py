@@ -5,7 +5,7 @@ from sklearn import clone
 from sklearn.pipeline import Pipeline
 from sklearn.externals import six
 from sklearn.utils.metaestimators import if_delegate_has_method
-from sklearn.utils import Bunch
+#from sklearn.utils import Bunch
 from sklearn.utils.validation import check_memory
 
 def _fit_transform_one(transformer, X, y, weight, **fit_params):
