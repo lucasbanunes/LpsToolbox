@@ -21,7 +21,7 @@ class PersGridSearchCV(BaseSearchCV):
                  n_jobs=None, iid='warn', refit=True, cv='warn', verbose=0,
                  pre_dispatch='2*n_jobs', error_score='raise-deprecating',
                  return_train_score="warn",
-                 cachedir='./', ):
+                 cachedir='./', return_estimator=False):
         super(PersGridSearchCV, self).__init__(
             estimator=estimator, scoring=scoring, fit_params=fit_params,
             n_jobs=n_jobs, iid=iid, refit=refit, cv=cv, verbose=verbose,
@@ -29,6 +29,7 @@ class PersGridSearchCV(BaseSearchCV):
             return_train_score=return_train_score)
         self.param_grid = param_grid
         self.cachedir = cachedir
+        self.return_estimator = return_estimator
         _check_param_grid(param_grid)
 
     def fit(self, X, y=None, groups=None, **fit_params):
@@ -97,7 +98,7 @@ class PersGridSearchCV(BaseSearchCV):
                                     return_n_test_samples=True,
                                     return_times=True,
                                     return_parameters=False,
-                                    return_estimator=False,
+                                    return_estimator=self.return_estimator,
                                     error_score=self.error_score,
                                     verbose=self.verbose)
         results_container = [{}]
@@ -150,8 +151,9 @@ class PersGridSearchCV(BaseSearchCV):
                                in product(candidate_params,
                                           list_split))
 
-                #all_estimators.extend([out_set[-1] for out_set in out])
-                #out = [out_set[:-1] for out_set in out]
+                if self.return_estimator:
+                    all_estimators.extend([out_set[-1] for out_set in out])
+                    out = [out_set[:-1] for out_set in out]
                 all_candidate_params.extend(candidate_params)
                 all_out.extend(out)
 
@@ -191,6 +193,9 @@ class PersGridSearchCV(BaseSearchCV):
 
         self.cv_results_ = results
         self.n_splits_ = n_splits
+
+        if self.return_estimator:
+            self.cv_estimators = all_estimators
 
         return self
 
