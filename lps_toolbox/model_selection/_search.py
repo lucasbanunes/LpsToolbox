@@ -21,7 +21,8 @@ class PersGridSearchCV(BaseSearchCV):
                  n_jobs=None, iid='warn', refit=True, cv='warn', verbose=0,
                  pre_dispatch='2*n_jobs', error_score='raise-deprecating',
                  return_train_score="warn",
-                 cachedir='./', return_estimator=False):
+                 cachedir='./', return_estimator=False,
+                 client=None):
         super(PersGridSearchCV, self).__init__(
             estimator=estimator, scoring=scoring, fit_params=fit_params,
             n_jobs=n_jobs, iid=iid, refit=refit, cv=cv, verbose=verbose,
@@ -30,6 +31,7 @@ class PersGridSearchCV(BaseSearchCV):
         self.param_grid = param_grid
         self.cachedir = cachedir
         self.return_estimator = return_estimator
+        self.client = client
         _check_param_grid(param_grid)
 
     def fit(self, X, y=None, groups=None, **fit_params):
@@ -143,13 +145,23 @@ class PersGridSearchCV(BaseSearchCV):
 
                 # print list(candidate_params)
                 # raise NotImplementedError
-                out = parallel(_fit_and_score_recv(i_fold,
-                                                   X, y,
-                                                   train, test,
-                                                   parameters)
-                               for (parameters, (i_fold, (train, test)))
-                               in product(candidate_params,
-                                          list_split))
+                if self.client is None:
+                    out = parallel(_fit_and_score_recv(i_fold,
+                                                       X, y,
+                                                       train, test,
+                                                       parameters)
+                                   for (parameters, (i_fold, (train, test)))
+                                   in product(candidate_params,
+                                              list_split))
+                else:
+                    dview = self.client[:]
+                    out = dview.map(_fit_and_score_recv(i_fold,
+                                                       X, y,
+                                                       train, test,
+                                                       parameters)
+                                   for (parameters, (i_fold, (train, test)))
+                                   in product(candidate_params,
+                                              list_split))
 
                 if self.return_estimator:
                     all_estimators.extend([out_set[-1] for out_set in out])
