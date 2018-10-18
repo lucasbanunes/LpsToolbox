@@ -155,13 +155,13 @@ class PersGridSearchCV(BaseSearchCV):
                                               list_split))
                 else:
                     dview = self.client[:]
-                    out = dview.map(_fit_and_score_recv(i_fold,
-                                                       X, y,
-                                                       train, test,
-                                                       parameters)
-                                   for (parameters, (i_fold, (train, test)))
-                                   in product(candidate_params,
-                                              list_split))
+                    out = dview.map(lambda parameters, i_fold, train, test :_fit_and_score_recv(i_fold,
+                                                                                                X, y,
+                                                                                                train, test,
+                                                                                                parameters),
+                                   [(parameters, i_fold, train, test) for (parameters, (i_fold, (train, test)))
+                                                                      in product(candidate_params,
+                                                                                 list_split)])
 
                 if self.return_estimator:
                     all_estimators.extend([out_set[-1] for out_set in out])
