@@ -1,5 +1,7 @@
+import copy_reg
 import os
 import time
+import types
 import warnings
 from itertools import product
 
@@ -154,8 +156,16 @@ class PersGridSearchCV(BaseSearchCV):
                                    in product(candidate_params,
                                               list_split))
                 else:
+                    def _pickle_method(m):
+                        if m.im_self is None:
+                            return getattr, (m.im_class, m.im_func.func_name)
+                        else:
+                            return getattr, (m.im_self, m.im_func.func_name)
+
+                    copy_reg.pickle(types.MethodType, _pickle_method)
+
                     dview = self.client[:]
-                    out = dview.map(lambda parameters, i_fold, train, test :_fit_and_score_recv(i_fold,
+                    out = dview.map(lambda parameters, i_fold, train, test: _fit_and_score_recv(i_fold,
                                                                                                 X, y,
                                                                                                 train, test,
                                                                                                 parameters),
