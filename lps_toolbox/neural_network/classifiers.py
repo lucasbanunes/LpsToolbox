@@ -7,7 +7,7 @@ import keras
 import inspect
 import numpy as np
 
-from lps_toolbox.metrics.classification import sp_index
+from lps_toolbox.metrics.classification import sp_index, recall_score
 from lps_toolbox.neural_network.base import BaseNNClassifier, Layers
 
 
@@ -525,13 +525,25 @@ class MLPClassifier(BaseNNClassifier):
 
         return layers_obj
 
-    def score(self, X, y, sample_weight=None):
+    def score(self, X, y, sample_weight=None, return_eff=True):
         if y.ndim > 1:
             y = y.argmax(axis=1)
 
         out = self.predict(X)
 
         cat_out = out.argmax(axis=1)
+
+        if return_eff:
+            recall = recall_score(y, cat_out)
+            scores = dict()
+            scores['eff_0'] = recall[0]
+            scores['eff_1'] = recall[1]
+            scores['eff_2'] = recall[2]
+            scores['eff_3'] = recall[3]
+
+            scores['sp'] = sp_index(y, cat_out)
+            return scores
+
         return sp_index(y, cat_out)
 
     @staticmethod
