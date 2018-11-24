@@ -273,6 +273,7 @@ class BaseNNClassifier(BaseEstimator, ClassifierMixin):
         :return:
         """
         return self.model.predict(X)
+
     def score(self, X, y, sample_weight=None, return_eff=True):
         """
 
@@ -290,12 +291,7 @@ class BaseNNClassifier(BaseEstimator, ClassifierMixin):
 
         if return_eff:
             recall = recall_score(y, cat_out)
-            scores = dict()
-            scores['eff_0'] = recall[0]
-            scores['eff_1'] = recall[1]
-            scores['eff_2'] = recall[2]
-            scores['eff_3'] = recall[3]
-
+            scores = {'eff_%i' % cls_i:recall[cls_i] for cls_i in np.unique(y)}
             scores['sp'] = sp_index(y, cat_out)
             return scores
 
