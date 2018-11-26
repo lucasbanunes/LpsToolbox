@@ -26,7 +26,7 @@ from keras import Sequential
 
 from sklearn.base import BaseEstimator, ClassifierMixin
 
-from lps_toolbox.metrics.classification import sp_index, recall_score
+from lps_toolbox.metrics.classification import sp_index
 
 MODEL_WEIGHTS_FILENAME = 'end_state'
 MODEL_BEST_WEIGHTS_FILENAME = 'best_weights'
@@ -274,7 +274,7 @@ class BaseNNClassifier(BaseEstimator, ClassifierMixin):
         """
         return self.model.predict(X)
 
-    def score(self, X, y, sample_weight=None, return_eff=True):
+    def score(self, X, y, sample_weight=None):
         """
 
         :param X:
@@ -284,17 +284,8 @@ class BaseNNClassifier(BaseEstimator, ClassifierMixin):
         """
         if y.ndim > 1:
             y = y.argmax(axis=1)
-
         out = self.predict(X)
-
         cat_out = out.argmax(axis=1)
-
-        if return_eff:
-            recall = recall_score(y, cat_out)
-            scores = {'eff_%i' % cls_i:recall[cls_i] for cls_i in np.unique(y)}
-            scores['sp'] = sp_index(y, cat_out)
-            return scores
-
         return sp_index(y, cat_out)
 
     def plot_training(self, ax=None,
