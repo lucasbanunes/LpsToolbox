@@ -43,7 +43,8 @@ def dump_checkpoint_config(trn_path, callbacks):
         json.dump(callbacks.to_json(), fp)
         fp.close()
     else:
-        raise NotImplementedError
+        pass
+        #raise NotImplementedError
 
 
 class BaseNNClassifier(BaseEstimator, ClassifierMixin):
@@ -523,7 +524,9 @@ def check_model_integrity(basefolder, model_p, trn_p):
 
     if os.path.exists(os.path.join(trn_path, MODEL_HISTORY_FILENAME)):
         if not trained and not recovery:
-            raise IOError('Training history found but model state information is missing')
+           # if not os.path.exists(os.path.join(trn_path, MODEL_BEST_WEIGHTS_FILENAME)):
+            os.remove(os.path.join(trn_path, MODEL_HISTORY_FILENAME))
+           #     raise IOError('Training history found but model state information is missing')
     else:
         if trained or recovery:
             raise IOError('Model state found but training history is missing')
