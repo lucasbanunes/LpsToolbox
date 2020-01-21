@@ -1,4 +1,7 @@
 """ Implements generators for LOFAR images.
+Authors :
+Pedro Henrique Braga Lisboa 
+Lucas Barra de Aguiar Nunes 
 """
 import contextlib
 import gc

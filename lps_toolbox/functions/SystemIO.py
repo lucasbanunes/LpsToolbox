@@ -1,3 +1,7 @@
+""" Functions to deal with file management
+Author: Pedro Henrique Braga Lisboa <pedro.lisboa@lps.ufrj.br>
+"""
+
 import joblib
 import datetime
 import os
