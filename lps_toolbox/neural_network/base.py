@@ -39,9 +39,9 @@ def dump_checkpoint_config(trn_path, callbacks):
     callback_path = os.path.join(trn_path, CALLBACKS_INFO_FILENAME)
     if not os.path.exists(os.path.join(callback_path)):
         print(callbacks.to_json())
-        fp = open(os.path.join(trn_path, CALLBACKS_INFO_FILENAME), 'wb')
-        json.dump(callbacks.to_json(), fp)
-        fp.close()
+        #fp = open(os.path.join(trn_path, CALLBACKS_INFO_FILENAME), 'wb')
+        #json.dump(callbacks.to_json(), fp)
+        #fp.close()
     else:
         pass
         #raise NotImplementedError
@@ -108,6 +108,7 @@ class BaseNNClassifier(BaseEstimator, ClassifierMixin):
         self.cachedir = cachedir
         self.history = None  # training history
         self.model = None  # model object after training
+        self.threshold = None
 
     def _build_checkpoints(self, filepath):
         if self.es_kwargs is None:
@@ -209,12 +210,12 @@ class BaseNNClassifier(BaseEstimator, ClassifierMixin):
         :param validation_split:
         :param validation_data:
         :param shuffle:
-        :param verbose:
+        :param verbose: Show the Keras trainning
         :param class_weight:
         :param sample_weight:
         :param steps_per_epoch:
         :param validation_steps:
-        :param cachedir:
+        :param cachedir: Where to save the results
         :return:
         """
         if class_weight:
@@ -235,33 +236,34 @@ class BaseNNClassifier(BaseEstimator, ClassifierMixin):
         trn_path, last_init, trained = check_model_integrity(cachedir, model_p, trn_p)
         best_weights_path = os.path.join(trn_path, MODEL_BEST_WEIGHTS_FILENAME)
 
-        if trained:
+        """if trained:
             print("Model trained, loading best weights")
-            model.load_weights(best_weights_path)
-        else:
-            checkpoints = self._build_checkpoints(trn_path)
-            dump_checkpoint_config(trn_path, checkpoints)
-            if shuffle:
-                X, y = sklearn.utils.shuffle(X, y)
-            for init in range(last_init, n_inits):
-                model.fit(x=X, y=y, batch_size=self.batch_size,
-                          epochs=self.epochs, verbose=verbose,
-                          callbacks=checkpoints.to_keras_fn(), validation_split=validation_split,
-                          validation_data=validation_data, shuffle=True,
-                          class_weight=class_weights, sample_weight=sample_weight,
-                          initial_epoch=0, steps_per_epoch=steps_per_epoch,
-                          validation_steps=validation_steps)
+            model.load_weights(best_weights_path)"""
+        
+        checkpoints = self._build_checkpoints(trn_path)
+        dump_checkpoint_config(trn_path, checkpoints)
+        if shuffle:
+            X, y = sklearn.utils.shuffle(X, y)
+        for init in range(last_init, n_inits):
+            print(model.summary())
+            model.fit(x=X, y=y, batch_size=self.batch_size,
+                        epochs=self.epochs, verbose=verbose,
+                        callbacks=checkpoints.to_keras_fn(), validation_split=validation_split,
+                        validation_data=validation_data, shuffle=True,
+                        class_weight=class_weights, sample_weight=sample_weight,
+                        initial_epoch=0, steps_per_epoch=steps_per_epoch,
+                        validation_steps=validation_steps)
 
-                optimizer = self.build_optimizer()  # Reset optimizer state
-                model.compile(optimizer=optimizer.to_keras_fn(),  # Reset model state
-                              loss=self.loss,
-                              metrics=self.metrics)
+            optimizer = self.build_optimizer()  # Reset optimizer state
+            model.compile(optimizer=optimizer.to_keras_fn(),  # Reset model state
+                            loss=self.loss,
+                            metrics=self.metrics)
 
-                os.rename(os.path.join(trn_path, RECOVER_TRAINING_FILENAME),
-                          os.path.join(trn_path, RECOVER_TRAINING_FILENAME + '_init_%i' % init))
+            os.rename(os.path.join(trn_path, RECOVER_TRAINING_FILENAME),
+                        os.path.join(trn_path, RECOVER_TRAINING_FILENAME + '_init_%i' % init))
 
-            os.rename(os.path.join(trn_path, RECOVER_TRAINING_FILENAME + '_init_%i' % (n_inits - 1)),
-                      os.path.join(trn_path, MODEL_WEIGHTS_FILENAME))
+        os.rename(os.path.join(trn_path, RECOVER_TRAINING_FILENAME + '_init_%i' % (n_inits - 1)),
+                    os.path.join(trn_path, MODEL_WEIGHTS_FILENAME))
         model.load_weights(best_weights_path)
         self.history = pd.read_csv(os.path.join(trn_path, MODEL_HISTORY_FILENAME))
         self.model = model
@@ -350,7 +352,7 @@ class BaseNNClassifier(BaseEstimator, ClassifierMixin):
         """
         return _build_optimizer(self.solver, self.momentum, self.nesterov,
                                      self.decay, self.learning_rate, self.amsgrad,
-                                     self.beta_1, self.beta_2, self.epsilon)
+                                     self.beta_1, self.beta_2, self.epsilon)         
 
 
 def build_early_stopping(monitor,
@@ -500,7 +502,7 @@ class TrainParams(object):
 
     def get_param_hash(self):
         json_params = self.to_json()
-        hash_params = hashlib.sha512(str(json_params)).hexdigest()
+        hash_params = hashlib.sha512(str(json_params).encode("utf-8")).hexdigest()
         return hash_params
 
 
@@ -545,18 +547,18 @@ def check_model_integrity(basefolder, model_p, trn_p):
         if trained:
             warnings.warn('Model state found in %s but topology information is missing from model folder'
                           'Data possibly corrupted' % train_model_state)
-        fp = open(os.path.join(model_path, 'topology.json'), 'wb')
-        json.dump(model_p.to_json(), fp, indent=1)
-        fp.close()
+        #fp = open(os.path.join(model_path, 'topology.json'), 'wb')
+        #json.dump(bytes(str(model_p.to_json()), encoding='utf-8'), fp, indent=1)
+        #fp.close()
 
     train_info = os.path.exists(os.path.join(trn_path, 'train_info.json'))
     if not train_info:
         if trained:
             warnings.warn('Model state found in %s but training information is missing from training folder'
                           'Data possibly corrupted' % train_model_state)
-        fp = open(os.path.join(trn_path, 'train_info.json'), 'wb')
-        json.dump(trn_p.to_json(), fp, indent=1)
-        fp.close()
+        #fp = open(os.path.join(trn_path, 'train_info.json'), 'wb')
+        #json.dump(trn_p.to_json(), fp, indent=1)
+        #fp.close()
     else:
         if not trained:
             warnings.warn('Training information found but model state file is missing from training folder'
@@ -594,7 +596,7 @@ class NNParams(object):
         # Setting parameters --------------------------------------
         self.__dict__ = OrderedDict()
         self.__dict__['input_shape'] = input_shape
-        print(optimizer)
+        #print(optimizer)
         if isinstance(optimizer, Optimizer):
             self.__dict__['optimizer'] = optimizer
         elif isinstance(optimizer, dict):
@@ -645,7 +647,7 @@ class NNParams(object):
         :return: Hash string
         """
         path = self.to_json()
-        return hashlib.sha512(str(path)).hexdigest()
+        return hashlib.sha512(str(path).encode('utf-8')).hexdigest()
 
     def to_json(self):
         """
@@ -667,7 +669,6 @@ class NNParams(object):
     def next(self):
         for param in self.__dict__:
             yield (param, self.__dict__[param])
-        raise StopIteration
 
 
 class Parameter(object):
@@ -746,7 +747,7 @@ class _ParameterSet(object):
     def next(self):
         for element in self.elements:
             yield element
-        raise StopIteration
+        
 
     def to_json(self):
         """

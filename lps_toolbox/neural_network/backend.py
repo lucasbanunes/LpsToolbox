@@ -15,6 +15,9 @@ class SequentialModelWrapper():
     """Keras Sequential Model wrapper class"""
 
     def __init__(self, trnParams, results_path):
+        """trnParams is a list of tuple with (variable, value) to be used in __dict__
+        (layers, [name]) layers = ParameterSet()
+        """
         self._mountParams(trnParams)
         if not os.path.exists(results_path + '/' + trnParams.get_param_path()):
             self.model_path = os.path.join(results_path, trnParams.get_param_path())
@@ -22,6 +25,7 @@ class SequentialModelWrapper():
             self.saveParams(trnParams)
 
     def load_weights(self, filepath):
+        """Load the weights wirtten in a file"""
         self.model.load_weights(filepath)
 
     def _mountParams(self, trnParams):
@@ -46,6 +50,7 @@ class SequentialModelWrapper():
         joblib.dump(trnParams.to_np_array(), os.path.join(self.model_path, 'model_info.jbl'))
 
     def __setattr__(self, key, value):
+        """Sets the class attributes"""
         self.__dict__[key] = value
 
     def __call__(self, *args, **kwargs):
@@ -56,7 +61,7 @@ class SequentialModelWrapper():
         self.model = Sequential()
         for layer in self.layers:
             self.model.add(layer.to_keras_fn())
-        print self.loss
+        print(self.loss)
         self.model.compile(optimizer=self.optimizer.to_keras_fn(),
                            loss=self.loss,
                            metrics=self.metrics)
