@@ -104,14 +104,19 @@ class LofarKfoldGenerator():
         self.window_size = window_size
         self.stride = stride
         self.folds = folds
+        self.shape = (len(self), self.window_size, len(self.data[0]))
         self.x_test = None
         self.y_test = None
+        self.x_fit = None
+        self.y_fit = None
         self.x_train = None
         self.y_train = None
+        self.x_valid = None
+        self.y_valid = None
 
     def split(self, fold, shuffle = False, verbose = False):
         """
-        Splits the data with train sets ans test sets
+        Splits the data with fit sets ans test sets
 
         Parameters:
         
@@ -153,15 +158,57 @@ class LofarKfoldGenerator():
                 self.x_test = windows[start:stop]
                 self.y_test = trgts[start:stop]
             else:
-                if type(self.x_train) == type(None):
-                    self.x_train = windows[start:stop]
-                    self.y_train = trgts[start:stop]
+                if type(self.x_fit) == type(None):
+                    self.x_fit = windows[start:stop]
+                    self.y_fit = trgts[start:stop]
                 else:
-                    self.x_train.extend(windows[start:stop])
-                    self.y_train.extend(trgts[start:stop])
+                    self.x_fit.extend(windows[start:stop])
+                    self.y_fit.extend(trgts[start:stop])
             current_fold += 1
         
         print('The data was splitted')
+
+    def validation_split(self, percentage, shuffle = False):
+        """
+        Splits the fit data into trainning data and split data for fitting in .fit_generator keras method
+
+        Parameters
+        
+        percentage: float between 0 and 1
+            Percentage of the fit data that will be used as validation data
+        
+        shuffle: boolean
+            If True shuffles the data
+        """
+
+        split = int(len(self.x_fit)*percentage)
+
+        if shuffle:
+            window_trgt = list(zip(self.x_fit, self.y_fit))
+            np.random.shuffle(window_trgt)
+
+            self.x_fit = list()
+            self.y_fit = list()
+            for win, t in window_trgt:
+                self.x_fit.append(win)
+                self.y_fit.append(t)
+
+
+        self.x_valid = self.x_fit[:split]
+        self.x_train = self.x_fit[split:]
+        self.y_valid = self.y_fit[:split]
+        self.y_train = self.y_fit[split:]
+
+    def get_valid_set(self):
+        """
+        Returns two numpy arrays with the full valid set (data,class)
+        """
+        x_valid = list()
+        y_valid = list()
+        for win, win_cls in zip(self.x_valid, self.y_valid):
+            x_valid.append(self.data[win])
+            y_valid.append(win_cls)
+        return (np.array(x_valid), np.array(y_valid))
 
     def get_train_set(self):
         """
@@ -169,7 +216,7 @@ class LofarKfoldGenerator():
         """
         x_train = list()
         y_train = list()
-        for win, win_cls in zip (self.x_train, self.y_train):
+        for win, win_cls in zip(self.x_train, self.y_train):
             x_train.append(self.data[win])
             y_train.append(win_cls)
         return np.array(x_train), np.array(y_train)   
@@ -189,12 +236,28 @@ class LofarKfoldGenerator():
         """Returns the length of the full windowed data"""
         windows, targets = self._get_windows()
         return len(targets)
-    
-    def shape(self):
-        s = (len(self), self.window_size, len(self.data[0]))
-        return s
 
-    def train_generator(self, batch_size):
+    def get_steps(self, batch_size):
+        """
+        Returns the number of steps necessary for one epoch in .fit_generator keras method
+        
+        Parameters:
+
+         batch_size: int
+            Size of the batch to be generated
+
+        Returns:
+        
+        steps:int
+            number of steps to be made
+        """
+
+        if (type(self.x_train) == None) or (type(self.y_train) == None):
+            raise RuntimeError('The data must be splitted before getting the steps values')
+
+        return int(len(self.x_train)/batch_size) 
+
+    def train_generator(self, batch_size, shuffle = False):
         """
         Generates the train data on demand
 
@@ -208,8 +271,19 @@ class LofarKfoldGenerator():
         (x_train_batch, y_train_batch: numpy array, numpy array): tuple
             Batch generated from the full train data
         """
+
         if (type(self.x_train) == None) or (type(self.y_train) == None):
             raise RuntimeError('The data must be splitted before generating the sets')
+
+        if shuffle:
+            window_trgt = list(zip(self.x_train, self.y_train))
+            np.random.shuffle(window_trgt)
+
+            self.x_train = list()
+            self.y_train = list()
+            for win, t in window_trgt:
+                self.x_train.append(win)
+                self.y_train.append(t)
 
         start = 0
 
@@ -217,7 +291,9 @@ class LofarKfoldGenerator():
             batch = list()
             for win in self.x_train[start:stop]:
                 batch.append(self.data[win])
-            yield (np.array(batch).reshape(self.window_size, len(self.freq), 1), np.array(self.y_train[start:stop]))
+            data = np.array(batch).reshape(batch_size, self.window_size, len(self.freq), 1)
+            target = np.array(self.y_train[start:stop])
+            yield (data, target)
             start = stop
         
     def test_generator(self):
