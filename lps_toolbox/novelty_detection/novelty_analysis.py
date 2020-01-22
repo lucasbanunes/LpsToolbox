@@ -1,4 +1,4 @@
-"""Base functions for dealing with the analysis of novelty detection with Neural Networks as classifiers
+"""This module contains base functions for dealing with the analysis of novelty detection with Neural Networks as classifiers
 Author: Lucas Barra de Aguiar Nunes"""
 
 import numpy as np
