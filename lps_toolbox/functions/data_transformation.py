@@ -74,7 +74,7 @@ class SonarRunsInfo():
 
 
 class LofarKfoldGenerator():
-    def __init__(self, data, target, runs_info, window_size, stride):
+    def __init__(self, data, target, freq, runs_info, window_size, stride, folds):
         """
         Parameters:
 
@@ -92,34 +92,44 @@ class LofarKfoldGenerator():
         
         stride: int
             Stride made by the sliding window that mounts the immages
-        """
         
+        folds: int
+            Number of folds to be made
+        """
+
         self.data = data
         self.target = target
+        self.freq = freq
         self.runs_info = runs_info
         self.window_size = window_size
         self.stride = stride
+        self.folds = folds
         self.x_test = None
         self.y_test = None
         self.x_train = None
         self.y_train = None
 
-    def split_train_test(self, validation_split, shuffle = False):
+    def split(self, fold, shuffle = False, verbose = False):
         """
         Splits the data with train sets ans test sets
 
         Parameters:
         
-        validation_split: int
-            percentage of the data that will be the test data
+        fold: int
+            current fold to make the split
 
         shuffle: boolean
             If True shuffles the data set
         """
 
         windows, trgts = self._get_windows()
-        split = int(len(trgts)*validation_split)
+        split = int((len(trgts))/self.folds)
 
+        #Testing if the fold divides without rest
+        if len(trgts)/self.folds != 0:
+            plus_1 = True
+
+        #Shuffling the data
         if shuffle:
             window_trgt = list(zip(windows, trgts))
             np.random.shuffle(window_trgt)
@@ -129,17 +139,33 @@ class LofarKfoldGenerator():
             for win, t in window_trgt:
                 windows.append(win)
                 trgts.append(t)
+        
+        current_fold = 0
+        start = 0
+        stop = split
 
-        self.x_test = np.array(windows[:split])
-        self.y_test = np.array(trgts[:split])
-        self.x_train = np.array(windows[split:])
-        self.y_train = np.array(trgts[split:])
-
+        while (current_fold <= (self.folds-1)):
+            if verbose:
+                print(f'Splitting fold {current_fold}')
+            if (current_fold == self.folds) and plus_1:
+                stop = stop +1
+            if current_fold == fold:
+                self.x_test = windows[start:stop]
+                self.y_test = trgts[start:stop]
+            else:
+                if type(self.x_train) == type(None):
+                    self.x_train = windows[start:stop]
+                    self.y_train = trgts[start:stop]
+                else:
+                    self.x_train.extend(windows[start:stop])
+                    self.y_train.extend(trgts[start:stop])
+            current_fold += 1
+        
         print('The data was splitted')
 
     def get_train_set(self):
         """
-        Returns the two numpy arrays with the full train set (data, class)
+        Returns two numpy arrays with the full train set (data, class)
         """
         x_train = list()
         y_train = list()
@@ -150,7 +176,7 @@ class LofarKfoldGenerator():
 
     def get_test_set(self):
         """
-        Returns the two numpy arrays with the full test set (data, class)
+        Returns two numpy arrays with the full test set (data, class)
         """
         x_test = list()
         y_test = list()
@@ -158,6 +184,15 @@ class LofarKfoldGenerator():
             x_test.append(self.data[win])
             y_test.append(win_cls)
         return np.array(x_test), np.array(y_test)
+    
+    def __len__(self):
+        """Returns the length of the full windowed data"""
+        windows, targets = self._get_windows()
+        return len(targets)
+    
+    def shape(self):
+        s = (len(self), self.window_size, len(self.data[0]))
+        return s
 
     def train_generator(self, batch_size):
         """
@@ -170,19 +205,19 @@ class LofarKfoldGenerator():
 
         Yields:
 
-        x_train_batch, y_train_batch: tuple
+        (x_train_batch, y_train_batch: numpy array, numpy array): tuple
             Batch generated from the full train data
         """
         if (type(self.x_train) == None) or (type(self.y_train) == None):
-            raise TypeError('The data must be splitted before generating the sets')
+            raise RuntimeError('The data must be splitted before generating the sets')
 
-        steps = int((len(self.x_train))/batch_size)
         start = 0
-        for stop in range(batch_size, steps*batch_size, batch_size):
+
+        for stop in range(batch_size, len(self.x_train), batch_size):
             batch = list()
             for win in self.x_train[start:stop]:
                 batch.append(self.data[win])
-            yield (np.array(batch), self.y_train[start:stop])
+            yield (np.array(batch).reshape(self.window_size, len(self.freq), 1), np.array(self.y_train[start:stop]))
             start = stop
         
     def test_generator(self):
@@ -198,7 +233,7 @@ class LofarKfoldGenerator():
         Get the windows' range from the data information
         
         Returns
-            numpy array, numpy array: data, target respectively
+            list, list: data, target respectively
         """
 
         windows = list()
@@ -213,7 +248,7 @@ class LofarKfoldGenerator():
                         break
                     windows.append(range(i, i+self.window_size))
                     target.append(run_cls)
-        return np.array(windows), np.array(target)
+        return windows, target
 
 
 def lofar2image(data, target, window_size, stride, runs_info, verbose = False):
