@@ -75,6 +75,25 @@ class SonarRunsInfo():
 
 class LofarKfoldGenerator():
     def __init__(self, data, target, runs_info, window_size, stride):
+        """
+        Parameters:
+
+        data: numpy array
+            LOFAR data
+        
+        target: numpy array
+            Known classification of each data
+        
+        runs_info: SonarRunsInfo
+            The class generated for the specific LOFAR data that was passed
+
+        window_size: int
+            Vertical size of the window
+        
+        stride: int
+            Stride made by the sliding window that mounts the immages
+        """
+        
         self.data = data
         self.target = target
         self.runs_info = runs_info
