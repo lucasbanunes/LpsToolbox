@@ -198,7 +198,7 @@ class LofarKfoldGenerator():
             If True shuffles the data
         """
 
-        split = int(len(self.x_fit)*percentage)
+        split = int((len(self.x_fit))*percentage)
 
         #Shuffling the data
         if shuffle:
@@ -222,6 +222,9 @@ class LofarKfoldGenerator():
         Returns two numpy arrays with the full valid set (data,class)
         """
 
+        if (not self.x_valid) and (not self.y_valid):
+            warnings.warn('The data was not splitted the valid set is empty')
+
         x_valid = list()
         y_valid = list()
 
@@ -230,6 +233,7 @@ class LofarKfoldGenerator():
             y_valid.append(win_cls)
         
         x_valid = np.array(x_valid)
+        x_valid = x_valid.reshape(-1, self.window_size, len(self.freq), 1)
         y_valid = np.array(y_valid)
 
         if categorical:
@@ -242,6 +246,9 @@ class LofarKfoldGenerator():
         Returns two numpy arrays with the full train set (data, class)
         """
 
+        if (not self.x_train) and (not self.y_train):
+            warnings.warn('The data was not splitted the train set is empty')
+        
         x_train = list()
         y_train = list()
 
@@ -262,6 +269,9 @@ class LofarKfoldGenerator():
         Returns two numpy arrays with the full test set (data, class)
         """
 
+        if (not self.x_test) and (not self.y_test):
+            warnings.warn('The data was not splitted the test set is empty.')
+
         x_test = list()
         y_test = list()
         
@@ -276,11 +286,6 @@ class LofarKfoldGenerator():
             y_test = to_categorical(y_test)
 
         return (x_test, y_test)
-    
-    def __len__(self):
-        """Returns the length of the full windowed data"""
-        windows, targets = self._get_windows()
-        return len(targets)
 
     def get_steps(self, batch_size):
         """
@@ -297,8 +302,8 @@ class LofarKfoldGenerator():
             number of steps to be made
         """
 
-        if (type(self.x_train) == None) or (type(self.y_train) == None):
-            raise RuntimeError('The data must be splitted before getting the steps values')
+        if (not self.x_train) and (not self.y_train):
+            warnings.warn('The train set is empty. The data must be splitted before getting the steps values, returning zero.')
 
         return int(len(self.x_train)/batch_size) 
 
@@ -339,7 +344,6 @@ class LofarKfoldGenerator():
             batch = np.array(batch)
             batch = batch.reshape(batch_size, self.window_size, len(self.freq), 1)
             target = np.array(self.y_train[start:stop])
-            print(target.shape)
             if categorical:
                 target = to_categorical(target)
             yield (batch, target)
@@ -354,6 +358,10 @@ class LofarKfoldGenerator():
                 win_cls = to_categorical(win_cls)
             yield self.data(win), win_cls
         
+    def __len__(self):
+        """Returns the length of the full windowed data"""
+        windows, targets = self._get_windows()
+        return len(targets)
 
     def _get_windows(self):
         """
