@@ -114,9 +114,9 @@ class LofarKfoldGenerator():
         self.x_valid = None
         self.y_valid = None
 
-    def split(self, fold, shuffle = False, verbose = False):
+    def split(self, fold, shuffle = False, validation = False, percentage = None, verbose = False):
         """
-        Splits the data with fit sets ans test sets
+        Splits the datato the desired sets
 
         Parameters:
         
@@ -125,6 +125,15 @@ class LofarKfoldGenerator():
 
         shuffle: boolean
             If True shuffles the data set
+        
+        validation: boolean
+            If true splits the fit data into validation and train data
+
+        percentage: float from 0 to 1
+            Percentage of the fit data that will be used as validation data during the fit of the model
+
+        verbose: boolean
+            If true gives output of the process
         """
 
         windows, trgts = self._get_windows()
@@ -149,6 +158,7 @@ class LofarKfoldGenerator():
         start = 0
         stop = split
 
+        #Splitting the folds
         while (current_fold <= (self.folds-1)):
             if verbose:
                 print(f'Splitting fold {current_fold}')
@@ -165,6 +175,13 @@ class LofarKfoldGenerator():
                     self.x_fit.extend(windows[start:stop])
                     self.y_fit.extend(trgts[start:stop])
             current_fold += 1
+        
+        if verbose:
+            print('The fold was splitted')
+
+        #Splitting the validation data
+        if validation:
+            self.validation_split(percentage, shuffle)
         
         print('The data was splitted')
 
@@ -183,6 +200,7 @@ class LofarKfoldGenerator():
 
         split = int(len(self.x_fit)*percentage)
 
+        #Shuffling the data
         if shuffle:
             window_trgt = list(zip(self.x_fit, self.y_fit))
             np.random.shuffle(window_trgt)
@@ -193,44 +211,71 @@ class LofarKfoldGenerator():
                 self.x_fit.append(win)
                 self.y_fit.append(t)
 
-
+        #Splitting
         self.x_valid = self.x_fit[:split]
         self.x_train = self.x_fit[split:]
         self.y_valid = self.y_fit[:split]
         self.y_train = self.y_fit[split:]
 
-    def get_valid_set(self):
+    def get_valid_set(self, categorical = False):
         """
         Returns two numpy arrays with the full valid set (data,class)
         """
+
         x_valid = list()
         y_valid = list()
+
         for win, win_cls in zip(self.x_valid, self.y_valid):
             x_valid.append(self.data[win])
             y_valid.append(win_cls)
-        return (np.array(x_valid), np.array(y_valid))
+        
+        x_valid = np.array(x_valid)
+        y_valid = np.array(y_valid)
 
-    def get_train_set(self):
+        if categorical:
+            y_valid = to_categorical(y_valid)
+
+        return (x_valid, y_valid)
+
+    def get_train_set(self, categorical = False):
         """
         Returns two numpy arrays with the full train set (data, class)
         """
+
         x_train = list()
         y_train = list()
+
         for win, win_cls in zip(self.x_train, self.y_train):
             x_train.append(self.data[win])
             y_train.append(win_cls)
-        return np.array(x_train), np.array(y_train)   
 
-    def get_test_set(self):
+        x_train = np.array(x_train)
+        y_train = np.array(y_train)
+
+        if categorical:
+            y_train = to_categorical(y_train)
+
+        return (x_train, y_train)   
+
+    def get_test_set(self, categorical = False):
         """
         Returns two numpy arrays with the full test set (data, class)
         """
+
         x_test = list()
         y_test = list()
+        
         for win, win_cls in zip (self.x_test, self.y_test):
             x_test.append(self.data[win])
             y_test.append(win_cls)
-        return np.array(x_test), np.array(y_test)
+        
+        x_test = np.array(x_test)
+        y_test = np.array(y_test)
+
+        if categorical:
+            y_test = to_categorical(y_test)
+
+        return (x_test, y_test)
     
     def __len__(self):
         """Returns the length of the full windowed data"""
@@ -257,7 +302,7 @@ class LofarKfoldGenerator():
 
         return int(len(self.x_train)/batch_size) 
 
-    def train_generator(self, batch_size, shuffle = False):
+    def train_generator(self, batch_size, shuffle = False, categorical = False):
         """
         Generates the train data on demand
 
@@ -291,16 +336,22 @@ class LofarKfoldGenerator():
             batch = list()
             for win in self.x_train[start:stop]:
                 batch.append(self.data[win])
-            data = np.array(batch).reshape(batch_size, self.window_size, len(self.freq), 1)
+            batch = np.array(batch)
+            batch = batch.reshape(batch_size, self.window_size, len(self.freq), 1)
             target = np.array(self.y_train[start:stop])
-            yield (data, target)
+            print(target.shape)
+            if categorical:
+                target = to_categorical(target)
+            yield (batch, target)
             start = stop
         
-    def test_generator(self):
+    def test_generator(self, categorical = False):
         """
         Yields each lofar image with its respective known classficiation
         """
         for win, win_cls, in zip(self.x_test, self.y_test):
+            if categorical:
+                win_cls = to_categorical(win_cls)
             yield self.data(win), win_cls
         
 
