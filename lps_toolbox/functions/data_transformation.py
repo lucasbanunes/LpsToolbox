@@ -16,7 +16,7 @@ from keras.utils import to_categorical
 from sklearn.base import TransformerMixin, BaseEstimator
 from sklearn.utils.validation import check_memory
 
-from SystemIO import listfolders, listfiles, load, exists, save
+from lps_toolbox.functions.SystemIO import listfolders, listfiles, load, exists, save
 
 
 class SonarRunsInfo():
@@ -307,7 +307,7 @@ class LofarKfoldGenerator():
 
         return int(len(self.x_train)/batch_size) 
 
-    def train_generator(self, batch_size, shuffle = False, categorical = False):
+    def train_generator(self, batch_size, epochs, shuffle = False, categorical = False):
         """
         Generates the train data on demand
 
@@ -336,14 +336,23 @@ class LofarKfoldGenerator():
                 self.y_train.append(t)
 
         start = 0
-
-        for stop in range(batch_size, len(self.x_train), batch_size):
+        for stop in range(batch_size, len(self.x_train)*epochs, batch_size):
             batch = list()
-            for win in self.x_train[start:stop]:
-                batch.append(self.data[win])
+            start_index = self._loop_index(self.y_train, start)
+            stop_index = self._loop_index(self.y_train, stop)
+            if stop_index < start_index:
+                target = np.array(self.y_train[start_index:])
+                target = np.concatenate((target, self.y_train[:stop_index]))
+                for win in self.x_train[start_index:]:
+                    batch.append(self.data[win])
+                for win in self.x_train[:stop_index]:
+                    batch.append(self.data[win])
+            else:
+                target = np.array(self.y_train[start_index:stop_index])
+                for win in self.x_train[start_index:stop_index]:
+                    batch.append(self.data[win])
             batch = np.array(batch)
-            batch = batch.reshape(batch_size, self.window_size, len(self.freq), 1)
-            target = np.array(self.y_train[start:stop])
+            batch = batch.reshape(batch_size, self.window_size, len(self.freq), 1)   
             if categorical:
                 target = to_categorical(target)
             yield (batch, target)
@@ -385,6 +394,14 @@ class LofarKfoldGenerator():
                     target.append(run_cls)
         return windows, target
 
+    def _loop_index(iterable, index):
+        length = len(iterable)
+        multiple = index/length
+        if multiple <= 1:
+            return index
+        else:
+            actual_index = index - (int(multiple)*length)
+            return actual_index
 
 def lofar2image(data, target, window_size, stride, runs_info, verbose = False):
     img_data = list()
@@ -412,3 +429,4 @@ def _get_window_array(window_size, start, stop, stride):
             break
         window_array.append(range(i, i+window_size))
     return window_array
+
