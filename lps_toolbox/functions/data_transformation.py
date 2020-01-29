@@ -9,6 +9,7 @@ import os
 import warnings
 import wave
 from collections import OrderedDict
+from copy import deepcopy
 
 import keras
 import numpy as np
@@ -103,7 +104,7 @@ class LofarKfoldGenerator(Lofar2ImgGenerator):
 
     def split(self, fold, shuffle = False, validation = False, percentage = None, verbose = False):
         """
-        Splits the datato the desired sets
+        Splits the data to the desired sets
 
         Parameters:
         
@@ -135,7 +136,7 @@ class LofarKfoldGenerator(Lofar2ImgGenerator):
             answer = 'y'
             if self._folded:
                 warnings.warn('The data was already splitted and folded, shuffling will alterate the folds.')
-                answer = scan('Do you want to continue? (Y/N)')
+                answer = input('Do you want to continue? (Y/N)')
                 answer = answer.lower()
             if answer == 'y':
                 window_trgt = list(zip(windows, trgts))
@@ -177,5 +178,73 @@ class LofarKfoldGenerator(Lofar2ImgGenerator):
             self.validation_split(percentage, shuffle)
         
         self._folded = True
+        
+        print('The data was splitted')
+        
+class LofarLeave1OutGenerator(Lofar2ImgGenerator):
+    def __init__(self, data, target, freq, runs_info, window_size, stride):
+        """
+        Parameters:
+
+        data: numpy array
+            LOFAR data
+        
+        target: numpy array
+            Known classification of each data
+        
+        runs_info: SonarRunsInfo
+            The class generated for the specific LOFAR data that was passed
+
+        window_size: int
+            Vertical size of the window
+        
+        stride: int
+            Stride made by the sliding window that mounts the immages
+        
+        """
+        super(LofarLeave1OutGenerator, self).__init__(data, target, freq, runs_info, window_size, stride)
+    
+    def split(self, run_class, run, shuffle = False, validation = False, percentage = None):
+        """
+        Splits the data to the desired sets
+
+        Parameters:
+        
+        cls: int
+            Index of the class that will be left out
+        
+        run: int
+            Index of the run from the class "cls" that will be left out
+
+        shuffle: boolean
+            If True shuffles the data set
+        
+        validation: boolean
+            If true splits the fit data into validation and train data
+
+        percentage: float from 0 to 1
+            Percentage of the fit data that will be used as validation data during the fit of the model
+        """
+
+        #Plitting the data into fit and test data
+        train_runs = deepcopy(list(self.runs_info.runs.values()))
+        test_run = train_runs[run_class].pop(run)
+        self.x_fit, self.y_fit = self._get_windows(train_runs)
+        self.x_test, self.y_test = self._get_windows([test_run], monoclass = True)
+
+        #Shuffling the data
+        if shuffle:
+            window_trgt = list(zip(self.x_fit, self.y_fit))
+            np.random.shuffle(window_trgt)
+
+            self.x_fit = list()
+            self.y_fit = list()
+            for win, t in window_trgt:
+                self.x_fit.append(win)
+                self.y_fit.append(t)
+
+        #Splitting the validation data
+        if validation:
+            self.validation_split(percentage, shuffle)   
         
         print('The data was splitted')

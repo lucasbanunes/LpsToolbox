@@ -1,3 +1,6 @@
+"""Base class for gor generators for LOFAR images
+Author: Lucas Barra de Aguiar Nunes"""
+
 import warnings
 import numpy as np
 from tensorflow.keras.utils import to_categorical
@@ -29,7 +32,6 @@ class Lofar2ImgGenerator():
         self.runs_info = runs_info
         self.window_size = window_size
         self.stride = stride
-        self.shape = (len(self), self.window_size, len(self.data[0]))
 
         #Attributes for the data
         self.x_test = None
@@ -236,9 +238,17 @@ class Lofar2ImgGenerator():
         windows, targets = self._get_windows()
         return len(targets)
 
-    def _get_windows(self):
+    def _get_windows(self, runs_values = None, monoclass = False, run_class = None):
         """
         Get the windows' range from the data information
+
+        Parameters
+
+        runs_values: iterable    
+            Iterable with the shape (class, [data.shape])
+        
+        monoclass: boolean
+            True if the runs_values had only one class, therefor its shape is only (data.shape)
         
         Returns
             list, list: data, target respectively
@@ -246,7 +256,12 @@ class Lofar2ImgGenerator():
 
         windows = list()
         target = list()
-        for run_cls, runs_array in enumerate(self.runs_info.runs.values()):
+
+        if not runs_values:
+            runs_values = self.runs_info.runs.values()
+        
+        if monoclass:
+            runs_array = runs_values
             for run in runs_array:
                 start = run[0]
                 stop = run[-1]
@@ -255,7 +270,19 @@ class Lofar2ImgGenerator():
                         #The end of the range overpasses the run window size
                         break
                     windows.append(range(i, i+self.window_size))
-                    target.append(run_cls)
+                    target.append(run_class)
+        else:
+            for run_cls, runs_array in enumerate(runs_values):
+                for run in runs_array:
+                    start = run[0]
+                    stop = run[-1]
+                    for i in range(start, stop, self.stride):
+                        if i+self.window_size > stop:
+                            #The end of the range overpasses the run window size
+                            break
+                        windows.append(range(i, i+self.window_size))
+                        target.append(run_cls)
+    
         return windows, target
 
     def _loop_index(self, iterable, index):
