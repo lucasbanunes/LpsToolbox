@@ -32,6 +32,7 @@ class Lofar2ImgGenerator():
         self.runs_info = runs_info
         self.window_size = window_size
         self.stride = stride
+        self.shape = (len(self), self.window_size, len(freq), 1)
 
         #Attributes for the data
         self.x_test = None
