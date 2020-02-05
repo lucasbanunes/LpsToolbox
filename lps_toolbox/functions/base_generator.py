@@ -15,6 +15,9 @@ class Lofar2ImgGenerator():
         
         target: numpy array
             Known classification of each data
+
+        freq: numpy array
+            Array with the values of frequency used
         
         runs_info: SonarRunsInfo
             The class generated for the specific LOFAR data that was passed
@@ -82,6 +85,16 @@ class Lofar2ImgGenerator():
     def get_valid_set(self, categorical = False):
         """
         Returns a tuple with two numpy arrays with the full valid set (data,class)
+
+        Parameters
+
+        categorical: boolean
+            If true the targeted classification array is outputted in categorical format
+
+        Returns:
+
+        (numpy array, numpy array): tuple
+            A tuple with the full valid set (data,class)
         """
 
         if (not self.x_valid) and (not self.y_valid):
@@ -106,6 +119,16 @@ class Lofar2ImgGenerator():
     def get_train_set(self, categorical = False):
         """
         Returns a tuple with two numpy arrays with the full train set (data, class)
+
+        Parameters
+
+        categorical: boolean
+            If true the targeted classification array is outputted in categorical format
+
+        Returns:
+
+        (numpy array, numpy array): tuple
+            A tuple with the full train set (data,class)
         """
 
         if (not self.x_train) and (not self.y_train):
@@ -129,6 +152,16 @@ class Lofar2ImgGenerator():
     def get_test_set(self, categorical = False):
         """
         Returns two numpy arrays with the full test set (data, class)
+
+        Parameters
+
+        categorical: boolean
+            If true the targeted classification array is outputted in categorical format
+
+        Returns:
+
+        (numpy array, numpy array): tuple
+            A tuple with the full test set (data,class)
         """
 
         if (not self.x_test) and (not self.y_test):
@@ -170,7 +203,7 @@ class Lofar2ImgGenerator():
 
         return int(len(self.x_train)/batch_size) 
 
-    def train_generator(self, batch_size, epochs, shuffle = False, categorical = False):
+    def train_generator(self, batch_size, epochs, n_inits=1,  shuffle = False, categorical = False):
         """
         Generates the train data on demand
 
@@ -178,6 +211,18 @@ class Lofar2ImgGenerator():
 
         batch_size: int
             Size of the batch to be generated
+
+        epochs: int
+            Number of epochs during the training of the model  
+
+        n_inits: int
+            Number of initializations of the model
+        
+        shuffle: boolean
+            If true shuffles the data before feeding it to the model
+
+        categorical: boolean
+            If true the targeted classification array is outputted in categorical format
 
         Yields:
 
@@ -199,11 +244,12 @@ class Lofar2ImgGenerator():
                 self.y_train.append(t)
 
         start = 0
-        for stop in range(batch_size, len(self.x_train)*epochs, batch_size):
+        for stop in range(batch_size, len(self.x_train)*epochs*n_inits, batch_size):
             batch = list()
             start_index = self._loop_index(self.y_train, start)
             stop_index = self._loop_index(self.y_train, stop)
 
+            #The indexes select the edges of the list
             if stop_index < start_index:
                 target = np.array(self.y_train[start_index:])
                 target = np.concatenate((target, self.y_train[:stop_index]))
@@ -228,11 +274,27 @@ class Lofar2ImgGenerator():
     def test_generator(self, categorical = False):
         """
         Yields each lofar image with its respective known classficiation
+
+        Parameters
+
+        categorical: boolean
+            If true the targeted classification array is outputted in categorical format
+
+        Yields:
+       
+        img: numpy_array
+            The data to be fed
+        
+        img_cls: numpy array
+            Correct classification of img
         """
         for win, win_cls, in zip(self.x_test, self.y_test):
             if categorical:
-                win_cls = to_categorical(win_cls)
-            yield self.data[win], win_cls
+                img_cls = to_categorical(win_cls)
+            
+            img = self.data[win]
+
+            yield img, img_cls
         
     def __len__(self):
         """Returns the length of the full windowed data"""
@@ -250,6 +312,9 @@ class Lofar2ImgGenerator():
         
         monoclass: boolean
             True if the runs_values had only one class, therefor its shape is only (data.shape)
+
+        run_class: int
+            Used only if monoclass is True. Value of the class used alone
         
         Returns
             list, list: data, target respectively
@@ -286,8 +351,23 @@ class Lofar2ImgGenerator():
     
         return windows, target
 
-    def _loop_index(self, iterable, index):
-        length = len(iterable)
+    def _loop_index(self, indexable, index):
+        """Returns a valid index to be used with slicing as a loop
+        
+        Parameters:
+
+        indexable: indexable object
+            Object used for ccalculating its correct index
+
+        index: int
+            Index of the loop
+
+        Returns:
+
+        actual_index: int
+            Atual usable index of the given object
+        """
+        length = len(indexable)
         multiple = index/length
         if multiple <= 1:
             return index
