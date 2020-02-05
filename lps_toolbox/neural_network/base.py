@@ -269,6 +269,82 @@ class BaseNNClassifier(BaseEstimator, ClassifierMixin):
         self.model = model
         return self
 
+    def fit_generator(self,generator, y,
+            input_shape,
+            n_inits=1,
+            validation_split=0.0,
+            validation_data=None,
+            shuffle=True,
+            verbose=1,
+            class_weight=True,
+            sample_weight=None,
+            steps_per_epoch=None,
+            validation_steps=None,
+            cachedir='./'):
+        """
+
+        :param X:
+        :param y:
+        :param n_inits:
+        :param validation_split:
+        :param validation_data:
+        :param shuffle:
+        :param verbose: Show the Keras trainning
+        :param class_weight:
+        :param sample_weight:
+        :param steps_per_epoch:
+        :param validation_steps:
+        :param cachedir: Where to save the results
+        :return:
+        """
+        if class_weight:
+            class_weights = _get_gradient_weights(y)
+        else:
+            class_weights = None
+
+        if n_inits < 1:
+            warnings.warn("Number of initializations must be at least one."
+                          "Falling back to one")
+            n_inits = 1
+
+        self.input_shape = input_shape
+        model, model_p = self._build_model()
+        trn_p = TrainParams(self.batch_size, self.epochs, verbose,
+                            validation_split, validation_data, shuffle,
+                            class_weight, sample_weight, steps_per_epoch, validation_steps)
+        trn_path, last_init, trained = check_model_integrity(cachedir, model_p, trn_p)
+        best_weights_path = os.path.join(trn_path, MODEL_BEST_WEIGHTS_FILENAME)
+
+        """if trained:
+            print("Model trained, loading best weights")
+            model.load_weights(best_weights_path)"""
+        
+        checkpoints = self._build_checkpoints(trn_path)
+        dump_checkpoint_config(trn_path, checkpoints)
+        
+        for init in range(last_init, n_inits):
+            print(model.summary())
+            model.fit_generator(generator,
+                                validation_data = validation_data,
+                                steps_per_epoch = steps_per_epoch, 
+                                epochs = self.epochs,
+                                callbacks = checkpoints.to_keras_fn())
+
+            optimizer = self.build_optimizer()  # Reset optimizer state
+            model.compile(optimizer=optimizer.to_keras_fn(),  # Reset model state
+                            loss=self.loss,
+                            metrics=self.metrics)
+
+            os.rename(os.path.join(trn_path, RECOVER_TRAINING_FILENAME),
+                        os.path.join(trn_path, RECOVER_TRAINING_FILENAME + '_init_%i' % init))
+
+        os.rename(os.path.join(trn_path, RECOVER_TRAINING_FILENAME + '_init_%i' % (n_inits - 1)),
+                    os.path.join(trn_path, MODEL_WEIGHTS_FILENAME))
+        model.load_weights(best_weights_path)
+        self.history = pd.read_csv(os.path.join(trn_path, MODEL_HISTORY_FILENAME))
+        self.model = model
+        return self
+
     def predict(self, X):
         """
 
@@ -507,8 +583,8 @@ class TrainParams(object):
 
 
 def check_model_integrity(basefolder, model_p, trn_p):
-    trn_hash = trn_p.get_param_hash()
-    model_hash = model_p.get_param_hash()
+    trn_hash = trn_p.get_param_hash() #hash generated folder name for the train params
+    model_hash = model_p.get_param_hash() #hash generated folder name for the model params
 
     model_path = os.path.join(basefolder, model_hash)
     trn_path = os.path.join(model_path, trn_hash)
