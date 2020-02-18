@@ -76,7 +76,7 @@ class SonarRunsInfo():
 
 
 class LofarKfoldGenerator(Lofar2ImgGenerator):
-    def __init__(self, data, target, freq, runs_info, window_size, stride, folds):
+    def __init__(self, data, target, freq, runs_info, window_size, stride, folds, novelty = False, novelty_class = None):
         """
         Parameters:
 
@@ -97,8 +97,14 @@ class LofarKfoldGenerator(Lofar2ImgGenerator):
         
         folds: int
             Number of folds to be made
+
+        novelty: boolean
+            True if part of the data will be treated as novelty
+
+        novelty_class: int
+            Class of data that will be treated as novelty
         """
-        super(LofarKfoldGenerator, self).__init__(data, target, freq, runs_info, window_size, stride)
+        super(LofarKfoldGenerator, self).__init__(data, target, freq, runs_info, window_size, stride, novelty, novelty_class)
         self.folds = folds
         self._folded = False
 
@@ -184,7 +190,7 @@ class LofarKfoldGenerator(Lofar2ImgGenerator):
         print('The data was splitted')
         
 class LofarLeave1OutGenerator(Lofar2ImgGenerator):
-    def __init__(self, data, target, freq, runs_info, window_size, stride):
+    def __init__(self, data, target, freq, runs_info, window_size, stride, novelty = False, novelty_class = None):
         """
         Parameters:
 
@@ -203,8 +209,14 @@ class LofarLeave1OutGenerator(Lofar2ImgGenerator):
         stride: int
             Stride made by the sliding window that mounts the immages
         
+        novelty: boolean
+            True if part of the data will be treated as novelty
+
+        novelty_class: int
+            Class of data that will be treated as novelty
+        
         """
-        super(LofarLeave1OutGenerator, self).__init__(data, target, freq, runs_info, window_size, stride)
+        super(LofarLeave1OutGenerator, self).__init__(data, target, freq, runs_info, window_size, stride, novelty, novelty_class)
     
     def split(self, run_class, run, shuffle = False, validation = False, percentage = None):
         """

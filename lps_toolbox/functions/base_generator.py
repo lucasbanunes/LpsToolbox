@@ -6,7 +6,7 @@ import numpy as np
 from tensorflow.keras.utils import to_categorical
 
 class Lofar2ImgGenerator():
-    def __init__(self, data, target, freq, runs_info, window_size, stride):
+    def __init__(self, data, target, freq, runs_info, window_size, stride, novelty = False, novelty_class = None):
         """
         Parameters:
 
@@ -27,6 +27,12 @@ class Lofar2ImgGenerator():
         
         stride: int
             Stride made by the sliding window that mounts the immages
+
+        novelty: boolean
+            True if part of the data will be treated as novelty
+
+        novelty_class: int
+            Class of data that will be treated as novelty
         """
 
         self.data = data
@@ -36,6 +42,16 @@ class Lofar2ImgGenerator():
         self.window_size = window_size
         self.stride = stride
         self.shape = (len(self), self.window_size, len(freq), 1)
+        self.classes = np.unique(self.target)
+        self.novelty = novelty
+        self.novelty_class = novelty_class
+
+        if self.novelty:
+            self.x_novelty = self.runs_info.pop(self.novelty_class)
+            self.y_novelty = self.novelty_class
+        else:
+            self.x_novelty = None
+            self.y_novelty = None
 
         #Attributes for the data
         self.x_test = None
@@ -151,7 +167,7 @@ class Lofar2ImgGenerator():
 
     def get_test_set(self, categorical = False):
         """
-        Returns two numpy arrays with the full test set (data, class)
+        Returns a tuple with the two numpy arrays with the full test set (data, class)
 
         Parameters
 
@@ -182,6 +198,27 @@ class Lofar2ImgGenerator():
 
         return (x_test, y_test)
 
+    def get_novelty_set(self):
+        """Returns a tule with the two numpy arrays with the full novelty set (data, class)
+        
+        Returns:
+        
+        (numpy array, numpy array): tuple
+            A tuple with the full novelty set (data, class)
+        """
+
+        if not novelty:
+            raise NameError("There's no novelty data set, you can define it at the initialization of the generator")
+
+        x_novelty = list()
+        y_novelty = list()
+
+        for win in self.x_novelty:
+            x_novelty.append(win)
+            y_novelty.append(self.novelty_class)
+
+        return (x_novelty, y_novelty)
+
     def get_steps(self, batch_size):
         """
         Returns the number of steps necessary for one epoch in .fit_generator keras method
@@ -203,7 +240,7 @@ class Lofar2ImgGenerator():
 
         return int(len(self.x_train)/batch_size) 
 
-    def train_generator(self, batch_size, epochs, n_inits=1,  shuffle = False, categorical = False):
+    def train_generator(self, batch_size, epochs, n_inits=1,  shuffle = False, categorical = False, novelty_fit = False):
         """
         Generates the train data on demand
 
@@ -223,6 +260,9 @@ class Lofar2ImgGenerator():
 
         categorical: boolean
             If true the targeted classification array is outputted in categorical format
+
+        novelty_fit boolean:
+            If true rearrenges the target data to fit the output of a neural network
 
         Yields:
 
@@ -264,10 +304,16 @@ class Lofar2ImgGenerator():
                     batch.append(self.data[win])
             
             batch = np.array(batch)
-            batch = batch.reshape(batch_size, self.window_size, len(self.freq), 1)  
+            batch = batch.reshape(batch_size, self.window_size, len(self.freq), 1) 
+
+            if novelty_fit:
+                print(target[:30])
+                print(type(target))
+                target = np.where(target>self.novelty_class, target-1, target)
+                print(target[:30])
 
             if categorical:
-                target = to_categorical(target)
+                target = to_categorical(target, len(self.classes))
             yield (batch, target)
             start = stop
         
@@ -296,6 +342,24 @@ class Lofar2ImgGenerator():
 
             yield img, img_cls
         
+    def novelty_generator(self):
+        """
+        Yields each lofar image with its respective known classficiation
+
+        Yields:
+       
+        img: numpy_array
+            The novelty data
+        
+        img_cls: numpy array
+            Correct classification of the img
+        """
+
+        for win in self.x_novelty:
+            img = self.data[win]
+
+            yield img, self.y_novelty
+
     def __len__(self):
         """Returns the length of the full windowed data"""
         windows, targets = self._get_windows()
