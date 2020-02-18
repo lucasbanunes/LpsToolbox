@@ -1,4 +1,4 @@
-"""Base class for gor generators for LOFAR images
+"""Base class for generators of LOFAR images
 Author: Lucas Barra de Aguiar Nunes"""
 
 import warnings
@@ -19,8 +19,8 @@ class Lofar2ImgGenerator():
         freq: numpy array
             Array with the values of frequency used
         
-        runs_info: SonarRunsInfo
-            The class generated for the specific LOFAR data that was passed
+        runs_info: list
+            List with the ranges of each recorded run where the first dimension is the class
 
         window_size: int
             Vertical size of the window
@@ -308,7 +308,7 @@ class Lofar2ImgGenerator():
         Parameters
 
         runs_values: iterable    
-            Iterable with the shape (class, [data.shape])
+            Iterable with the shape (class, [data.shape]), variable from which the smaller images will be assembled
         
         monoclass: boolean
             True if the runs_values had only one class, therefor its shape is only (data.shape)
@@ -324,7 +324,7 @@ class Lofar2ImgGenerator():
         target = list()
 
         if not runs_values:
-            runs_values = self.runs_info.runs.values()
+            runs_values = self.runs_info
         
         if monoclass:
             runs_array = runs_values

@@ -86,8 +86,8 @@ class LofarKfoldGenerator(Lofar2ImgGenerator):
         target: numpy array
             Known classification of each data
         
-        runs_info: SonarRunsInfo
-            The class generated for the specific LOFAR data that was passed
+        runs_info: list
+            List with the ranges of each recorded run where the first dimension is the class
 
         window_size: int
             Vertical size of the window
@@ -148,12 +148,12 @@ class LofarKfoldGenerator(Lofar2ImgGenerator):
                     windows.append(win)
                     trgts.append(t)
         
-        current_fold = 0
+        current_fold = 1
         start = 0
         stop = split
 
         #Splitting the folds
-        while (current_fold <= (self.folds-1)):
+        while (current_fold <= self.folds):
             if verbose:
                 print(f'Splitting fold {current_fold}')
             if (current_fold == self.folds) and plus_1:
@@ -168,6 +168,8 @@ class LofarKfoldGenerator(Lofar2ImgGenerator):
                 else:
                     self.x_fit.extend(windows[start:stop])
                     self.y_fit.extend(trgts[start:stop])
+            start = current_fold*split
+            stop = (current_fold+1)*split
             current_fold += 1
         
         if verbose:
@@ -192,8 +194,8 @@ class LofarLeave1OutGenerator(Lofar2ImgGenerator):
         target: numpy array
             Known classification of each data
         
-        runs_info: SonarRunsInfo
-            The class generated for the specific LOFAR data that was passed
+        runs_info: list
+            List with the ranges of each recorded run where the first dimension is the class
 
         window_size: int
             Vertical size of the window
@@ -227,7 +229,7 @@ class LofarLeave1OutGenerator(Lofar2ImgGenerator):
         """
 
         #Plitting the data into fit and test data
-        train_runs = deepcopy(list(self.runs_info.runs.values()))
+        train_runs = deepcopy(self.runs_info)
         test_run = train_runs[run_class].pop(run)
         self.x_fit, self.y_fit = self._get_windows(train_runs)
         self.x_test, self.y_test = self._get_windows([test_run], monoclass = True)
