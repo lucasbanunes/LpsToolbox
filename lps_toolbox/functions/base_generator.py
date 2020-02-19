@@ -39,7 +39,7 @@ class Lofar2ImgGenerator():
         self.data = data
         self.target = target
         self.freq = freq
-        self.classes = np.unique(self.target)
+        self.classes , self.event_count= np.unique(self.target, return_counts = True)
 
         #Novelty data information
         self.novelty = novelty
@@ -107,7 +107,7 @@ class Lofar2ImgGenerator():
 
     def get_valid_set(self, categorical = False):
         """
-        Returns a tuple with two numpy arrays with the full valid set (data,class)
+        Returns two numpy arrays with the full valid set data,class
 
         Parameters
 
@@ -116,8 +116,8 @@ class Lofar2ImgGenerator():
 
         Returns:
 
-        (numpy array, numpy array): tuple
-            A tuple with the full valid set (data,class)
+        x_valid, y_valid: numpy array, numpy array
+            The full valid set data,class
         """
 
         if (not self.x_valid) and (not self.y_valid):
@@ -137,11 +137,11 @@ class Lofar2ImgGenerator():
         if categorical:
             y_valid = to_categorical(y_valid)
 
-        return (x_valid, y_valid)
+        return x_valid, y_valid
 
     def get_train_set(self, categorical = False, novelty_format = False):
         """
-        Returns a tuple with two numpy arrays with the full train set (data, class)
+        Returns two numpy arrays with the full train set data, class
 
         Parameters
 
@@ -153,8 +153,8 @@ class Lofar2ImgGenerator():
 
         Returns:
 
-        (numpy array, numpy array): tuple
-            A tuple with the full train set (data,class)
+        x_train, y_train: numpy array, numpy array
+            The full train set data,class
         """
 
         if (not self.x_train) and (not self.y_train):
@@ -177,11 +177,11 @@ class Lofar2ImgGenerator():
         elif categorical:
             y_train = to_categorical(y_train)
 
-        return (x_train, y_train)   
+        return x_train, y_train   
 
     def get_test_set(self, categorical = False, novelty_format = False):
         """
-        Returns a tuple with the two numpy arrays with the full test set (data, class)
+        Returns two numpy arrays with the full test set data, class
 
         Parameters
 
@@ -193,8 +193,8 @@ class Lofar2ImgGenerator():
 
         Returns:
 
-        (numpy array, numpy array): tuple
-            A tuple with the full test set (data,class)
+        x_test, y_test: numpy array, numpy array
+            The full test set data,class
         """
 
         if (not self.x_test) and (not self.y_test):
@@ -220,12 +220,12 @@ class Lofar2ImgGenerator():
         return (x_test, y_test)
 
     def get_novelty_set(self):
-        """Returns a tuple with the two numpy arrays with the full novelty set (data, class)
+        """Returns  two numpy arrays with the full novelty set data, class
         
         Returns:
         
-        (numpy array, numpy array): tuple
-            A tuple with the full novelty set (data, class)
+        x_novelty, y_novelty: numpy array, numpy array
+            The full novelty set data,class
         """
 
         if not self.novelty:
