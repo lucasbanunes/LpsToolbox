@@ -269,7 +269,9 @@ class BaseNNClassifier(BaseEstimator, ClassifierMixin):
         self.model = model
         return self
 
-    def fit_generator(self,generator, y,
+    def fit_generator(self,generator,
+            cls_indices, 
+            event_count,
             input_shape,
             n_inits=1,
             validation_split=0.0,
@@ -282,23 +284,53 @@ class BaseNNClassifier(BaseEstimator, ClassifierMixin):
             validation_steps=None,
             cachedir='./'):
         """
+        Trains the model using the moel.fit_generator keras method
 
-        :param X:
-        :param y:
-        :param n_inits:
-        :param validation_split:
-        :param validation_data:
-        :param shuffle:
-        :param verbose: Show the Keras trainning
-        :param class_weight:
-        :param sample_weight:
-        :param steps_per_epoch:
-        :param validation_steps:
-        :param cachedir: Where to save the results
-        :return:
+        Parameters:
+
+        generator:
+            Generates the training data by batches in the format (data, target)
+        
+        cls_indices: iterable
+            Iterable with the index of classes
+
+        event_count: iterable
+            Contains the event count of each class ate the position event_count[class]
+
+        input_shape: tuple
+            Shape of the input data
+        
+        n_inits: int
+            Number of initializations of the model
+
+        validation_split: float from 0 to 1
+            Percentage of the trainning data that will be used for validation during the fitting process
+
+        validation_data: tuple
+            Data that will be used for validation during the fitting process, the format must be (data, target)
+        
+        shuffle: boolean
+            If true shuffles the data
+        
+        verbose: int
+            If not falsy outputs the method activity
+        
+        class_weight: boolean
+            If true uses information over the balance of different classes events
+
+        steps_per_epoch: int
+            Number of steps realized per epoch
+
+        validation_steps: int
+            Number of steps realized during validation
+        
+        cachedir: string
+            Filepath to the cache directory
+
         """
         if class_weight:
-            class_weights = _get_gradient_weights(y)
+            min_class = min(event_count)
+            class_weights = {cls_index: float(min_class) / cls_count for cls_index, cls_count in zip(cls_indices, event_count)}
         else:
             class_weights = None
 
@@ -328,7 +360,8 @@ class BaseNNClassifier(BaseEstimator, ClassifierMixin):
                                 validation_data = validation_data,
                                 steps_per_epoch = steps_per_epoch, 
                                 epochs = self.epochs,
-                                callbacks = checkpoints.to_keras_fn())
+                                callbacks = checkpoints.to_keras_fn(),
+                                class_weight=class_weights)
 
             optimizer = self.build_optimizer()  # Reset optimizer state
             model.compile(optimizer=optimizer.to_keras_fn(),  # Reset model state
