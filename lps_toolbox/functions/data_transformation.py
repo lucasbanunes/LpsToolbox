@@ -130,6 +130,11 @@ class LofarKfoldGenerator(Lofar2ImgGenerator):
             If true gives output of the process
         """
 
+        #Windowing the novelty data if it exists
+        if self.novelty:
+            self.x_novelty, self.y_novelty = self._get_windows(self.novelty_runs_info, self.novelty_class)
+
+        #Windowing the full known data
         windows, trgts = self._get_windows()
         split = int((len(trgts))/self.folds)
 
@@ -154,12 +159,12 @@ class LofarKfoldGenerator(Lofar2ImgGenerator):
                     windows.append(win)
                     trgts.append(t)
         
-        current_fold = 1
+        current_fold = 0
         start = 0
         stop = split
 
         #Splitting the folds
-        while (current_fold <= self.folds):
+        while (current_fold < self.folds):
             if verbose:
                 print(f'Splitting fold {current_fold}')
             if (current_fold == self.folds) and plus_1:
@@ -240,11 +245,15 @@ class LofarLeave1OutGenerator(Lofar2ImgGenerator):
             Percentage of the fit data that will be used as validation data during the fit of the model
         """
 
-        #Plitting the data into fit and test data
+        #Windowing the novelty data if it exists
+        if self.novelty:
+            self.x_novelty, self.y_novelty = self._get_windows(self.novelty_runs_info, self.novelty_class)
+
+        #Splitting and windowing the known data into fit and test data
         train_runs = deepcopy(self.runs_info)
         test_run = train_runs[run_class].pop(run)
-        self.x_fit, self.y_fit = self._get_windows(train_runs)
-        self.x_test, self.y_test = self._get_windows([test_run], monoclass = True)
+        self.x_fit, self.y_fit = self._get_windows(train_runs, self.classes)
+        self.x_test, self.y_test = self._get_windows([test_run], run_class)
 
         #Shuffling the data
         if shuffle:

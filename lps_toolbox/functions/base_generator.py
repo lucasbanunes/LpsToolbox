@@ -35,25 +35,30 @@ class Lofar2ImgGenerator():
             Class of data that will be treated as novelty
         """
 
+        #Full data information
         self.data = data
         self.target = target
         self.freq = freq
-        self.runs_info = runs_info
-        self.window_size = window_size
-        self.stride = stride
-        self.shape = (len(self), self.window_size, len(freq), 1)
         self.classes = np.unique(self.target)
+
+        #Novelty data information
         self.novelty = novelty
         self.novelty_class = novelty_class
-
-        if self.novelty:
-            self.x_novelty = self.runs_info.pop(self.novelty_class)
-            self.y_novelty = self.novelty_class
+        
+        if novelty:
+            self.novelty_runs_info = [runs_info.pop(self.novelty_class)]
         else:
-            self.x_novelty = None
-            self.y_novelty = None
+            self.novelty_runs_info = None
 
-        #Attributes for the data
+        #Information of the runs
+        self.runs_info = runs_info
+                
+        #Windowed data information
+        self.window_size = window_size
+        self.stride = stride
+        self.window_shape = (self.window_size, len(freq), 1)
+
+        #Attributes for the windowed data
         self.x_test = None
         self.y_test = None
         self.x_fit = None
@@ -62,6 +67,8 @@ class Lofar2ImgGenerator():
         self.y_train = None
         self.x_valid = None
         self.y_valid = None
+        self.x_novelty = None
+        self.y_novelty = None
 
     def split(self):
         raise NotImplementedError
@@ -132,7 +139,7 @@ class Lofar2ImgGenerator():
 
         return (x_valid, y_valid)
 
-    def get_train_set(self, categorical = False):
+    def get_train_set(self, categorical = False, novelty_format = False):
         """
         Returns a tuple with two numpy arrays with the full train set (data, class)
 
@@ -140,6 +147,9 @@ class Lofar2ImgGenerator():
 
         categorical: boolean
             If true the targeted classification array is outputted in categorical format
+        
+        novelty_format: boolean
+            If true the targeted classification array is outputted considering the given novelty class
 
         Returns:
 
@@ -160,12 +170,16 @@ class Lofar2ImgGenerator():
         x_train = np.array(x_train)
         y_train = np.array(y_train)
 
-        if categorical:
+        if novelty_format:
+            y_train = np.where(y_train>self.novelty_class, y_train-1, y_train)
+            if categorical:
+                y_train = to_categorical(y_train, (len(self.classes)-1))
+        elif categorical:
             y_train = to_categorical(y_train)
 
         return (x_train, y_train)   
 
-    def get_test_set(self, categorical = False):
+    def get_test_set(self, categorical = False, novelty_format = False):
         """
         Returns a tuple with the two numpy arrays with the full test set (data, class)
 
@@ -173,6 +187,9 @@ class Lofar2ImgGenerator():
 
         categorical: boolean
             If true the targeted classification array is outputted in categorical format
+
+        novelty_format: boolean
+            If true the targeted classification array is outputted considering the given novelty class
 
         Returns:
 
@@ -193,13 +210,17 @@ class Lofar2ImgGenerator():
         x_test = np.array(x_test)
         y_test = np.array(y_test)
 
-        if categorical:
+        if novelty_format:
+            y_test = np.where(y_test>self.novelty_class, y_test-1, y_test)
+            if categorical:
+                y_test = to_categorical(y_test, (len(self.classes)-1))
+        elif categorical:
             y_test = to_categorical(y_test)
 
         return (x_test, y_test)
 
     def get_novelty_set(self):
-        """Returns a tule with the two numpy arrays with the full novelty set (data, class)
+        """Returns a tuple with the two numpy arrays with the full novelty set (data, class)
         
         Returns:
         
@@ -207,15 +228,18 @@ class Lofar2ImgGenerator():
             A tuple with the full novelty set (data, class)
         """
 
-        if not novelty:
+        if not self.novelty:
             raise NameError("There's no novelty data set, you can define it at the initialization of the generator")
 
         x_novelty = list()
         y_novelty = list()
 
-        for win in self.x_novelty:
+        for win, win_cls in zip(self.x_novelty, self.y_novelty):
             x_novelty.append(win)
-            y_novelty.append(self.novelty_class)
+            y_novelty.append(win_cls)
+
+        x_novelty = np.array(x_novelty)
+        y_novelty = np.array(y_novelty)
 
         return (x_novelty, y_novelty)
 
@@ -240,7 +264,7 @@ class Lofar2ImgGenerator():
 
         return int(len(self.x_train)/batch_size) 
 
-    def train_generator(self, batch_size, epochs, n_inits=1,  shuffle = False, categorical = False, novelty_fit = False):
+    def train_generator(self, batch_size, epochs, n_inits=1,  shuffle = False, categorical = False):
         """
         Generates the train data on demand
 
@@ -260,9 +284,6 @@ class Lofar2ImgGenerator():
 
         categorical: boolean
             If true the targeted classification array is outputted in categorical format
-
-        novelty_fit boolean:
-            If true rearrenges the target data to fit the output of a neural network
 
         Yields:
 
@@ -306,14 +327,13 @@ class Lofar2ImgGenerator():
             batch = np.array(batch)
             batch = batch.reshape(batch_size, self.window_size, len(self.freq), 1) 
 
-            if novelty_fit:
-                print(target[:30])
-                print(type(target))
+            if self.novelty:
                 target = np.where(target>self.novelty_class, target-1, target)
-                print(target[:30])
-
-            if categorical:
+                if categorical:
+                    target = to_categorical(target, (len(self.classes)-1))
+            elif categorical:
                 target = to_categorical(target, len(self.classes))
+
             yield (batch, target)
             start = stop
         
@@ -335,8 +355,13 @@ class Lofar2ImgGenerator():
             Correct classification of img
         """
         for win, win_cls, in zip(self.x_test, self.y_test):
-            if categorical:
-                img_cls = to_categorical(win_cls)
+            if self.novelty:
+                if win_cls>self.novelty_class:
+                    img_cls = win_cls - 1
+                else:
+                    img_cls = win_cls
+                if categorical:
+                    img_cls = to_categorical(win_cls, (len(self.classes)-1))
             
             img = self.data[win]
 
@@ -365,20 +390,18 @@ class Lofar2ImgGenerator():
         windows, targets = self._get_windows()
         return len(targets)
 
-    def _get_windows(self, runs_values = None, monoclass = False, run_class = None):
+    def _get_windows(self, runs_values = None, run_class = None):
         """
         Get the windows' range from the data information
+        Default configuration windows the entire data excpet the novelty data if it exists
 
         Parameters
 
         runs_values: iterable    
             Iterable with the shape (class, [data.shape]), variable from which the smaller images will be assembled
-        
-        monoclass: boolean
-            True if the runs_values had only one class, therefor its shape is only (data.shape)
 
-        run_class: int
-            Used only if monoclass is True. Value of the class used alone
+        run_class: int or iterable
+            Targeted classification of the data
         
         Returns
             list, list: data, target respectively
@@ -390,9 +413,19 @@ class Lofar2ImgGenerator():
         if not runs_values:
             runs_values = self.runs_info
         
-        if monoclass:
-            runs_array = runs_values
+        if not run_class:
+            if self.novelty:
+                run_class = np.delete(self.classes, self.novelty_class)
+            else:
+                run_class = self.classes
+        
+        if type(run_class) == int: #There is only one class
+            run_class = np.full((len(runs_values), ), run_class)
+        print(run_class)
+        for run_cls, runs_array in zip(run_class, runs_values):
+            print(runs_array)
             for run in runs_array:
+                #print(run)
                 start = run[0]
                 stop = run[-1]
                 for i in range(start, stop, self.stride):
@@ -400,18 +433,7 @@ class Lofar2ImgGenerator():
                         #The end of the range overpasses the run window size
                         break
                     windows.append(range(i, i+self.window_size))
-                    target.append(run_class)
-        else:
-            for run_cls, runs_array in enumerate(runs_values):
-                for run in runs_array:
-                    start = run[0]
-                    stop = run[-1]
-                    for i in range(start, stop, self.stride):
-                        if i+self.window_size > stop:
-                            #The end of the range overpasses the run window size
-                            break
-                        windows.append(range(i, i+self.window_size))
-                        target.append(run_cls)
+                    target.append(run_cls)
     
         return windows, target
 
