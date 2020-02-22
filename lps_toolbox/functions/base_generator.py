@@ -3,6 +3,7 @@ Author: Lucas Barra de Aguiar Nunes"""
 
 import warnings
 import numpy as np
+from copy import deepcopy
 from tensorflow.keras.utils import to_categorical
 
 class Lofar2ImgGenerator():
@@ -46,6 +47,7 @@ class Lofar2ImgGenerator():
         self.novelty_class = novelty_class
         
         if novelty:
+            runs_info = deepcopy(runs_info)
             self.novelty_runs_info = [runs_info.pop(self.novelty_class)]
         else:
             self.novelty_runs_info = None
@@ -241,7 +243,7 @@ class Lofar2ImgGenerator():
         x_novelty = np.array(x_novelty)
         y_novelty = np.array(y_novelty)
 
-        return (x_novelty, y_novelty)
+        return x_novelty, y_novelty
 
     def get_steps(self, batch_size):
         """
@@ -421,11 +423,8 @@ class Lofar2ImgGenerator():
         
         if type(run_class) == int: #There is only one class
             run_class = np.full((len(runs_values), ), run_class)
-        print(run_class)
         for run_cls, runs_array in zip(run_class, runs_values):
-            print(runs_array)
             for run in runs_array:
-                #print(run)
                 start = run[0]
                 stop = run[-1]
                 for i in range(start, stop, self.stride):
