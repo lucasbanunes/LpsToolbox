@@ -107,7 +107,7 @@ class Lofar2ImgGenerator():
         self.y_valid = self.y_fit[:split]
         self.y_train = self.y_fit[split:]
 
-    def get_valid_set(self, categorical = False):
+    def get_valid_set(self, categorical = False, novelty_format = False):
         """
         Returns two numpy arrays with the full valid set data,class
 
@@ -115,6 +115,9 @@ class Lofar2ImgGenerator():
 
         categorical: boolean
             If true the targeted classification array is outputted in categorical format
+
+        novelty_format: boolean
+            If true the targeted classification array is outputted considering the given novelty class
 
         Returns:
 
@@ -136,7 +139,11 @@ class Lofar2ImgGenerator():
         x_valid = x_valid.reshape(-1, self.window_size, len(self.freq), 1)
         y_valid = np.array(y_valid)
 
-        if categorical:
+        if novelty_format:
+            y_valid = np.where(y_valid>self.novelty_class, y_valid-1, y_valid)
+            if categorical:
+                y_valid = to_categorical(y_valid, (len(self.classes)-1))
+        elif categorical:
             y_valid = to_categorical(y_valid)
 
         return x_valid, y_valid
