@@ -244,7 +244,7 @@ class Lofar2ImgGenerator():
         y_novelty = list()
 
         for win, win_cls in zip(self.x_novelty, self.y_novelty):
-            x_novelty.append(win)
+            x_novelty.append(self.data[win])
             y_novelty.append(win_cls)
 
         x_novelty = np.array(x_novelty)
