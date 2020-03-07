@@ -46,14 +46,14 @@ class Lofar2ImgGenerator():
         self.novelty = novelty
         self.novelty_class = novelty_class
         
-        if novelty:
+        if self.novelty:
             runs_info = deepcopy(runs_info)
-            self.novelty_runs_info = [runs_info.pop(self.novelty_class)]
+            self.novelty_runs_info = [runs_info.pop(self.novelty_class)]# shape (1, runs)
         else:
             self.novelty_runs_info = None
 
         #Information of the runs
-        self.runs_info = runs_info
+        self.runs_info = runs_info #shape(number of non novelty classes, runs of each class)
                 
         #Windowed data information
         self.window_size = window_size
@@ -268,8 +268,7 @@ class Lofar2ImgGenerator():
         """
 
         if (not self.x_train) and (not self.y_train):
-            warnings.warn('The train set is empty. The data must be splitted before getting the steps values, returning zero.')
-            return 0
+            raise TypeError('The train set is empty. The data must be splitted before getting the steps values, returning zero.')
 
         return int(len(self.x_train)/batch_size) 
 
@@ -301,7 +300,7 @@ class Lofar2ImgGenerator():
         """
 
         if (type(self.x_train) == None) or (type(self.y_train) == None):
-            raise RuntimeError('The data must be splitted before generating the sets')
+            raise NameError('Trainning data not defined. The data must be splitted before generating the set')
 
         if shuffle:
             window_trgt = list(zip(self.x_train, self.y_train))
@@ -314,7 +313,9 @@ class Lofar2ImgGenerator():
                 self.y_train.append(t)
 
         start = 0
-        for stop in range(batch_size, len(self.x_train)*epochs*n_inits, batch_size):
+        end = (len(self.x_train)*epochs*n_inits) + batch_size
+
+        for stop in range(batch_size, end, batch_size):
             batch = list()
             start_index = self._loop_index(self.y_train, start)
             stop_index = self._loop_index(self.y_train, stop)
@@ -371,6 +372,8 @@ class Lofar2ImgGenerator():
                     img_cls = win_cls
                 if categorical:
                     img_cls = to_categorical(win_cls, (len(self.classes)-1))
+            else:
+                img_cls = win_cls
             
             img = self.data[win]
 
@@ -402,12 +405,12 @@ class Lofar2ImgGenerator():
     def _get_windows(self, runs_values = None, run_class = None):
         """
         Get the windows' range from the data information
-        Default configuration windows the entire data excpet the novelty data if it exists
+        Default configuration windows the entire non novelty data
 
         Parameters
 
-        runs_values: iterable    
-            Iterable with the shape (class, [data.shape]), variable from which the smaller images will be assembled
+        runs_values: iterable   
+            Iterable with the shape (class, (data.shape)), variable from which the smaller images will be assembled
 
         run_class: int or iterable
             Targeted classification of the data
@@ -416,20 +419,26 @@ class Lofar2ImgGenerator():
             list, list: data, target respectively
         """
 
+        #Data that will store the ranges of the windows and the targets
         windows = list()
         target = list()
 
-        if not runs_values:
+        #Checking if the parameters were passed
+        if type(runs_values) == type(None):
             runs_values = self.runs_info
-        
-        if not run_class:
+
+        if type(run_class) == type(None):
             if self.novelty:
                 run_class = np.delete(self.classes, self.novelty_class)
             else:
                 run_class = self.classes
-        
-        if type(run_class) == int: #There is only one class
+
+        #Checking if the class is an iterable or not
+        try:
+            iter(run_class)
+        except TypeError:
             run_class = np.full((len(runs_values), ), run_class)
+
         for run_cls, runs_array in zip(run_class, runs_values):
             for run in runs_array:
                 start = run[0]
