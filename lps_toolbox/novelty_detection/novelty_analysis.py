@@ -4,8 +4,7 @@ Author: Lucas Barra de Aguiar Nunes"""
 import numpy as np
 import pandas as pd
 from sklearn.metrics import recall_score, fbeta_score, accuracy_score, precision_score, confusion_matrix
-from lps_toolbox.metrics.classification import sp_index
-from lps_toolbox.novelty_detection.metrics import sp_index_multiclass, sp_index_binary
+from lps_toolbox.novelty_detection.metrics import sp_index_binary, sp_index
 
 
 def create_threshold(quantity, 
@@ -65,6 +64,9 @@ def get_results(predictions,
         filepath: string
             where to save the .csv file
 
+        filename: string
+            name of the file to be saved
+
         Return
 
             novelty_frame: pandas.DataFrame
@@ -106,6 +108,7 @@ def read_results_csv(filepath):
 
 def get_novelty_eff(results_frame,
                     novelty_class,
+                    labels,
                     average = None, 
                     beta = 1, 
                     normalize = True, 
@@ -123,6 +126,9 @@ def get_novelty_eff(results_frame,
 
     novelty_class
         class treated as novelty
+
+    labels: list
+        contains the name of the classes or its numbers
     
     average: None or string
         parameter defined for sklearn.metrics.precision_recall_fscore_support
@@ -132,6 +138,15 @@ def get_novelty_eff(results_frame,
     
     normalize: boolean
         defines normalization of the precision metric
+
+    save _csv: boolean
+        if true saves the data frame as a .csv file
+
+    filepath: string
+        where to save the .csv file
+    
+    filename: string
+        name of the file to be saved
     
     verbose: boolean
         if true gives output of the function's activity
@@ -142,19 +157,20 @@ def get_novelty_eff(results_frame,
     y_true = np.where(results_frame.loc[:, 'Target'].values == novelty_class, 1, 0)
     novelty_matrix = np.array(get_novelty_from_frame(results_frame, novelty_class), dtype = float)
     thresh = results_frame.loc[:, 'Classification'].columns.values
-    precision = _get_precision(y_true, novelty_matrix, average=average)
-    recall = _get_recall(y_true, novelty_matrix, average=average)
-    fbeta = _get_fbeta(y_true, novelty_matrix, beta, average=average)
+    precision = _get_precision(y_true, novelty_matrix, average=average, labels=labels)
+    recall = _get_recall(y_true, novelty_matrix, average=average, labels=labels)
+    fbeta = _get_fbeta(y_true, novelty_matrix, beta, average=average, labels=labels)
     if average:
         sp = _get_sp_index(y_true, novelty_matrix)
         acc = _get_accuracy(y_true, novelty_matrix, normalize)
-        novelty_rate = class_detection_rate(y_true, novelty_matrix)
+        novelty_rate = class_detection_rate(y_true, novelty_matrix, clas=1)
         if verbose:
             print(f'Precision array shape is {precision.shape} and it is:\n{precision}')
             print(f'Recall array shape is {recall.shape} and it is:\n{recall}')
             print(f'Fbeta array shape is {fbeta.shape} and it is:\n{fbeta}')
             print(f'Accuracy array shape is {acc.shape} and it is:\n{acc}')
             print(f'SP array shape is {sp.shape} and it is:\n{sp}')
+            print(f'Novelty Rate array shape is {novelty_rate.shape}and it is:\n{novelty_rate}')
         data = np.concatenate((acc.reshape(-1,1), precision.reshape(-1,1), recall.reshape(-1,1), fbeta.reshape(-1,1), sp.reshape(-1,1), novelty_rate.reshape(-1,1)), axis=1)
         nov_eff_frame = pd.DataFrame(data, index = thresh, columns = ['Accuracy', 'Precision', 'Recall', 'Fbeta', 'SP', 'Novelty Rate'])
         nov_eff_frame.index.name = 'Threshold'
@@ -190,7 +206,7 @@ def get_classf_eff(results_frame,
     results_frame: pandas.DataFrame
         frame obtained from get_results
 
-    labels: 1-d array like
+    labels: list
         contains the name of the classes or its numbers
     
     average: None or string
@@ -198,6 +214,18 @@ def get_classf_eff(results_frame,
     
     beta: float or int
         beta value to be used in the evaluation of f-beta
+    
+    normalize: boolean
+        defines normalization of the precision metric
+
+    save _csv: boolean
+        if true saves the data frame as a .csv file
+
+    filepath: string
+        where to save the .csv file
+    
+    filename: string
+        name of the file to be saved
 
     verbose: boolean
         if true gives outṕut of the function's activity
@@ -237,7 +265,66 @@ def get_classf_eff(results_frame,
     if save_csv:
         filepath = filepath + '/' +filename
         eff_frame.to_csv(filepath, index = True)
-    return eff_frame    
+    return eff_frame
+
+def get_confusion_matrix(results_frame, binary=False, clas=None, save_csv = False, filepath = './', filename = None):
+    """
+    Function for calculating the confusion matrix of a classification made by a model
+
+    Parameters:
+
+    results_frame: pandas.DataFrame
+        frame obtained from get_results
+
+    binary: bool
+        If True calculates the confusion matrix of a single class treated as positive
+
+    clas: int
+        Class that will be used if the binary parameter is true
+
+    save _csv: boolean
+        if true saves the data frame as a .csv file
+
+    filepath: string
+        where to save the .csv file
+    
+    filename: string
+        name of the file to be saved
+
+    Returns:
+        confusion_frame: pandas.DataFrame
+    """
+    
+    y_true = results_frame.loc[:,'Target'].values.flatten()
+    pred_matrix = results_frame.loc[:,'Classification'].values
+    thresh = results_frame.loc[:,'Classification'].columns.values.flatten()
+    if binary:
+        y_true = np.where(y_true == clas, 1, 0)
+        pred_matrix = np.where(pred_matrix == clas, 1, 0)
+        parameters = {'tp':0, 'tn': 0, 'fp': 0, 'fn': 0}
+        data = list()
+        index = pd.MultiIndex.from_product([thresh, [1,0]])
+        columns = [1,0]
+        for prediction_array in pred_matrix.T:
+            for prediction, target in zip(prediction_array, y_true):
+                if target == 1 and prediction == 1:
+                    parameters['tp'] += 1
+                elif target == 0 and prediction == 1:
+                    parameters['fp'] += 1
+                elif target == 1 and prediction == 0:
+                    parameters['fn'] += 1
+                else:
+                    parameters['tp'] += 1
+            data.append(np.array([[parameters['tp'], parameters['fp']], [parameters['fn'], parameters['tp']]]))
+            parameters = {'tp':0, 'tn': 0, 'fp': 0, 'fn': 0}
+        data = np.vstack(tuple(data))
+    else:
+        raise NotImplementedError('Confusion matrix for multiclass data has not been implemented yet')
+    confusion_frame = pd.DataFrame(data, index = index, columns = columns)
+    if save_csv:
+        filepath = filepath + '/' + filename
+        confusion_frame.to_csv(filepath, index = True)
+    return confusion_frame    
 
 def get_novelty_from_frame(results_frame, novelty_class):
     """
@@ -381,7 +468,6 @@ def _get_sp_index(y_true, pred_matrix):
         sp = np.array([])
         for prediction in pred_matrix.T:
             sp = np.append(sp, sp_index(y_true, prediction))
-        
         return sp
     elif (len(pred_matrix.shape) == 1) or (pred_matrix.shape[1] == 1):
         return(y_true, pred_matrix.flatten())
@@ -418,7 +504,7 @@ def _get_sp_binary(y_true, pred_matrix, classes):
         sp.append(np.apply_along_axis(lambda x: sp_index_binary(y_true, x, clas), 0, pred_matrix))
     return np.array(sp)
 
-def class_detection_rate(y_true, pred_matrix, clas = None):
+def class_detection_rate(y_true, pred_matrix, clas):
     """
     detection ratio of a determined class in comparison with the correct number of occurrences
     Parameters:
@@ -429,20 +515,15 @@ def class_detection_rate(y_true, pred_matrix, clas = None):
     pred_matrix: numpy.array
         Classfication obtained from the model (events as rows) if no "clas" parameter is provided the desired class to be calculated must be 1 and the others 0
         
-
     clas: int
-        Clas that will have its detection rate calculated
+        Class that will have its detection rate calculated
     
     Returns:
     detection_rate: int or 1d numpy array
     """
-    if not (type(clas) == type(None)):
-        y_true = np.where(y_true == clas, 1, 0)
-        pred_matrix = np.where(pred_matrix == clas, 1, 0)
-
-    detection_rate = np.array([])
-    occurrences = np.sum(y_true == 1)
-    for column in pred_matrix.T:
-        pred_occurences = np.sum(column == 1)
-        detection_rate = np.append(detection_rate, (pred_occurences/occurrences))
+    y_true = np.where(y_true == clas, 1, 0)
+    pred_matrix = np.where(pred_matrix == clas, 1, 0)
+    occurrences = np.sum(y_true)
+    pred_occurences = np.sum(pred_matrix, axis=0)
+    detection_rate = pred_occurences/occurrences
     return detection_rate
