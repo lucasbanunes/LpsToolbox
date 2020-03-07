@@ -355,7 +355,6 @@ class BaseNNClassifier(BaseEstimator, ClassifierMixin):
         dump_checkpoint_config(trn_path, checkpoints)
         
         for init in range(last_init, n_inits):
-            print(model.summary())
             model.fit_generator(generator,
                                 validation_data = validation_data,
                                 steps_per_epoch = steps_per_epoch, 
@@ -461,7 +460,14 @@ class BaseNNClassifier(BaseEstimator, ClassifierMixin):
         """
         return _build_optimizer(self.solver, self.momentum, self.nesterov,
                                      self.decay, self.learning_rate, self.amsgrad,
-                                     self.beta_1, self.beta_2, self.epsilon)         
+                                     self.beta_1, self.beta_2, self.epsilon)
+
+    def get_layers(self):
+        """
+
+        :return:
+        """
+        return self.model.layers
 
 
 def build_early_stopping(monitor,
