@@ -248,10 +248,16 @@ class LofarLeave1OutGenerator(Lofar2ImgGenerator):
         #Windowing the novelty data if it exists and rearranging the class value if it is over the novelty class
         if self.novelty:
             self.x_novelty, self.y_novelty = self._get_windows(self.novelty_runs_info, self.novelty_class)
+            if run_class>self.novelty_class:
+                index = run_class - 1
+            else:
+                index = run_class
+        else:
+            index = run_class
 
         #Splitting and windowing the known data into fit and test data
         train_runs = deepcopy(self.runs_info)
-        test_run = train_runs[run_class].pop(run)
+        test_run = train_runs[index].pop(run)
         self.x_fit, self.y_fit = self._get_windows(train_runs, np.delete(self.classes, self.novelty_class))
         self.x_test, self.y_test = self._get_windows(np.array([[test_run]]), run_class)
 
