@@ -107,15 +107,18 @@ class LofarKfoldGenerator(Lofar2ImgGenerator):
         super(LofarKfoldGenerator, self).__init__(data, target, freq, runs_info, window_size, stride, novelty, novelty_class)
         self.folds = folds
         self._folded = False
+        self.current_fold = None
+        self.x_folds = None
+        self.y_folds = None
 
-    def split(self, fold, shuffle = False, validation = False, percentage = None, verbose = False):
+    def split(self, test_fold, shuffle = False, validation = False, percentage = None, verbose = False):
         """
         Splits the data to the desired sets
 
         Parameters:
         
-        fold: int
-            current fold to make the split
+        test_fold: int
+            fold to be treated as the test fold
 
         shuffle: boolean
             If True shuffles the data set
@@ -131,68 +134,85 @@ class LofarKfoldGenerator(Lofar2ImgGenerator):
         """
 
         if not self._folded:
+            self.x_novelty, self.y_novelty = self._get_windows([self.runs_info[self.novelty_class]], self.novelty_class)
+
+            #Copying to mantain the original data untouched
+            known_runs = deepcopy(self.runs_info)
+            known_classes = deepcopy(self.classes)
+
             #Windowing the novelty data if it exists
             if self.novelty:
-                self.x_novelty, self.y_novelty = self._get_windows(self.novelty_runs_info, self.novelty_class)
+                self.x_novelty, self.y_novelty = self._get_windows([self.runs_info[self.novelty_class]], self.novelty_class)
+                known_runs.pop(self.novelty_class)
+                known_classes = np.delete(known_classes, self.novelty_class)
 
             #Windowing the full known data
             windows, trgts = self._get_windows()
             self._split = int((len(trgts))/self.folds)
 
-            #Testing if the fold divides without rest
+            #Testing if the folds divides without rest
             if len(trgts)/self.folds != 0:
                 self.plus_1 = True
+            
+            #Folding the data
+            start = 0
+            stop = self._split
+            self.x_folds = list()
+            self.y_folds = list()
 
-        #Shuffling the data
-        if shuffle:
-            answer = 'y'
-            if self._folded:
-                warnings.warn('The data was already splitted and folded, shuffling will alterate the folds.')
-                answer = input('Do you want to continue? (Y/N)')
-            if answer.lower() == 'y':
-                window_trgt = list(zip(windows, trgts))
-                np.random.shuffle(window_trgt)
+            for fold in range(self.folds):
 
-                windows = list()
-                trgts = list()
-                for win, t in window_trgt:
-                    windows.append(win)
-                    trgts.append(t)
-        
-        current_fold = 0
-        start = 0
-        stop = self._split
+                if verbose:
+                    print(f'Splitting fold {fold}')
 
-        #Splitting the folds
-        while (current_fold < self.folds):
+                if self.plus_1 and (fold == (self.folds-1)):
+                    stop += 1
+
+                self.x_folds.append(windows[start:stop])
+                self.y_folds.append(windows[start:stop])
+            
             if verbose:
-                print(f'Splitting fold {current_fold}')
-            if (current_fold == self.folds) and self.plus_1:
-                stop += 1
-            if current_fold == fold:
-                self.x_test = windows[start:stop]
-                self.y_test = trgts[start:stop]
-            else:
-                if type(self.x_fit) == type(None):
-                    self.x_fit = windows[start:stop]
-                    self.y_fit = trgts[start:stop]
-                else:
-                    self.x_fit.extend(windows[start:stop])
-                    self.y_fit.extend(trgts[start:stop])
-            start = current_fold*self._split
-            stop = (current_fold+1)*self._split
-            current_fold += 1
-        
-        if verbose:
-            print('The fold was splitted')
+                print(f'Previous fold {self.current_fold}')
+                print('The data was folded')
+                print(f'Current fold {test_fold}')
 
-        #Splitting the validation data
-        if validation:
-            self.validation_split(percentage, shuffle)
-        
-        self._folded = True
-        
-        print('The data was splitted')
+            self.current_fold = test_fold
+            self._folded = True
+
+            #Shuffling the data
+            if shuffle:
+                for fold in range(len(self.y_folds)):
+                    window_trgt = list(zip(self.x_folds[fold], self.y_folds[fold]))
+                    np.random.shuffle(window_trgt)
+                    temp_data = list()
+                    temp_target = list()
+                    for data, target in window_trgt:
+                        temp_data.append(data)
+                        temp_target.append(target)
+                    self.x_folds[fold] = temp_data
+                    self.y_folds[fold] = temp_target
+            
+            #Assining each fold to is correspoding class
+            self.x_test = self.x_folds[test_fold]
+            self.y_test = self.y_folds[test_fold]
+
+            #Copying data for preserving the original and removing the test
+            self.x_fit = deepcopy(self.x_folds)
+            self.x_fit.pop(test_fold)
+            self.y_fit = deepcopy(self.y_folds)
+            self.y_fit.pop(test_fold)
+            self.x_fit = list(np.hstack(tuple(self.x_fit)))
+            self.y_fit = list(np.hstack(tuple(self.y_fit)))
+
+            #Splitting the validation data
+            if validation:
+                self.validation_split(percentage, shuffle)
+            
+            self._folded = True
+
+            gc.collect()
+            
+            print('The data was splitted')
         
 class LofarLeave1OutGenerator(Lofar2ImgGenerator):
     def __init__(self, data, target, freq, runs_info, window_size, stride, novelty = False, novelty_class = None):
@@ -245,20 +265,23 @@ class LofarLeave1OutGenerator(Lofar2ImgGenerator):
             Percentage of the fit data that will be used as validation data during the fit of the model
         """
 
+        #Copying to mantain the original data untouched
+        known_runs = deepcopy(self.runs_info)
+        test_run = known_runs[run_class].pop(run)
+
         #Windowing the novelty data if it exists and rearranging the class value if it is over the novelty class
+
         if self.novelty:
-            self.x_novelty, self.y_novelty = self._get_windows(self.novelty_runs_info, self.novelty_class)
-            if run_class>self.novelty_class:
-                index = run_class - 1
-            else:
-                index = run_class
+            if run_class == self.novelty_class:
+                raise ValueError("The class of the run to be left out can't be the novelty class.")
+            self.x_novelty, self.y_novelty = self._get_windows([self.runs_info[self.novelty_class]], self.novelty_class)
+            known_runs.pop(self.novelty_class)
+            known_classes = np.delete(self.classes, self.novelty_class)
         else:
-            index = run_class
+            known_classes = self.classes
 
         #Splitting and windowing the known data into fit and test data
-        train_runs = deepcopy(self.runs_info)
-        test_run = train_runs[index].pop(run)
-        self.x_fit, self.y_fit = self._get_windows(train_runs, np.delete(self.classes, self.novelty_class))
+        self.x_fit, self.y_fit = self._get_windows(known_runs, known_classes)
         self.x_test, self.y_test = self._get_windows(np.array([[test_run]]), run_class)
 
         #Shuffling the data
@@ -274,6 +297,8 @@ class LofarLeave1OutGenerator(Lofar2ImgGenerator):
 
         #Splitting the validation data
         if validation:
-            self.validation_split(percentage, shuffle)   
+            self.validation_split(percentage, shuffle)
+        
+        gc.collect() #Collecting the garbage
         
         print('The data was splitted')

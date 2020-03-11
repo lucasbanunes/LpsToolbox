@@ -45,15 +45,9 @@ class Lofar2ImgGenerator():
         #Novelty data information
         self.novelty = novelty
         self.novelty_class = novelty_class
-        
-        if self.novelty:
-            runs_info = deepcopy(runs_info)
-            self.novelty_runs_info = [runs_info.pop(self.novelty_class)]# shape (1, runs)
-        else:
-            self.novelty_runs_info = None
 
         #Information of the runs
-        self.runs_info = runs_info #shape(number of non novelty classes, runs of each class)
+        self.runs_info = runs_info
                 
         #Windowed data information
         self.window_size = window_size
@@ -405,7 +399,7 @@ class Lofar2ImgGenerator():
     def _get_windows(self, runs_values = None, run_class = None):
         """
         Get the windows' range from the data information
-        Default configuration windows the entire non novelty data
+        Default configuration windows the entire data, without distintion between novelty and known data.
 
         Parameters
 
@@ -413,7 +407,8 @@ class Lofar2ImgGenerator():
             Iterable with the shape (class, (data.shape)), variable from which the smaller images will be assembled
 
         run_class: int or iterable
-            Targeted classification of the data
+            Targeted classification of the data. The value on index i must be the class of the runs array from runs_values in index i.
+        
         
         Returns
             list, list: data, target respectively
@@ -428,10 +423,7 @@ class Lofar2ImgGenerator():
             runs_values = self.runs_info
 
         if type(run_class) == type(None):
-            if self.novelty:
-                run_class = np.delete(self.classes, self.novelty_class)
-            else:
-                run_class = self.classes
+            run_class = self.classes
 
         #Checking if the class is an iterable or not
         try:
