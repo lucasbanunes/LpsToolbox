@@ -341,7 +341,7 @@ class Lofar2ImgGenerator():
             yield (batch, target)
             start = stop
         
-    def test_generator(self, categorical = False):
+    def test_generator(self, categorical = False, novelty_format=False):
         """
         Yields each lofar image with its respective known classficiation
 
@@ -349,6 +349,9 @@ class Lofar2ImgGenerator():
 
         categorical: boolean
             If true the targeted classification array is outputted in categorical format
+
+        novelty_format: boolean
+            If true the targeted classification array is outputted considering the given novelty class
 
         Yields:
        
@@ -359,7 +362,7 @@ class Lofar2ImgGenerator():
             Correct classification of img
         """
         for win, win_cls, in zip(self.x_test, self.y_test):
-            if self.novelty:
+            if novelty_format:
                 if win_cls>self.novelty_class:
                     img_cls = win_cls - 1
                 else:
@@ -367,7 +370,10 @@ class Lofar2ImgGenerator():
                 if categorical:
                     img_cls = to_categorical(win_cls, (len(self.classes)-1))
             else:
-                img_cls = win_cls
+                if categorical:
+                    img_cls = to_categorical(win_cls, len(self.classes))
+                else:
+                    img_cls = win_cls
             
             img = self.data[win]
 
@@ -389,7 +395,7 @@ class Lofar2ImgGenerator():
         for win in self.x_novelty:
             img = self.data[win]
 
-            yield img, self.y_novelty
+            yield img, self.novelty_class
 
     def __len__(self):
         """Returns the length of the full windowed data"""
