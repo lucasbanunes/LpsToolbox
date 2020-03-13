@@ -164,6 +164,7 @@ def get_novelty_eff(results_frame,
         sp = _get_sp_index(y_true, novelty_matrix)
         acc = _get_accuracy(y_true, novelty_matrix, normalize)
         novelty_rate = class_detection_rate(y_true, novelty_matrix, clas=1)
+        trigger_rate = class_detection_rate(y_true, novelty_matrix, clas=0)
         if verbose:
             print(f'Precision array shape is {precision.shape} and it is:\n{precision}')
             print(f'Recall array shape is {recall.shape} and it is:\n{recall}')
@@ -171,8 +172,9 @@ def get_novelty_eff(results_frame,
             print(f'Accuracy array shape is {acc.shape} and it is:\n{acc}')
             print(f'SP array shape is {sp.shape} and it is:\n{sp}')
             print(f'Novelty Rate array shape is {novelty_rate.shape}and it is:\n{novelty_rate}')
-        data = np.concatenate((acc.reshape(-1,1), precision.reshape(-1,1), recall.reshape(-1,1), fbeta.reshape(-1,1), sp.reshape(-1,1), novelty_rate.reshape(-1,1)), axis=1)
-        nov_eff_frame = pd.DataFrame(data, index = thresh, columns = ['Accuracy', 'Precision', 'Recall', 'Fbeta', 'SP', 'Novelty Rate'])
+            print(f'Trigger Rate array shape is {trigger_rate.shape} and it is:\n{trigger_rate}')
+        data = np.concatenate((acc.reshape(-1,1), precision.reshape(-1,1), recall.reshape(-1,1), fbeta.reshape(-1,1), sp.reshape(-1,1), novelty_rate.reshape(-1,1), trigger_rate.reshape(-1,1)), axis=1)
+        nov_eff_frame = pd.DataFrame(data, index = thresh, columns = ['Accuracy', 'Precision', 'Recall', 'Fbeta', 'SP', 'Novelty Rate', 'Trigger Rate'])
         nov_eff_frame.index.name = 'Threshold'
     else:
         if verbose:
@@ -320,6 +322,17 @@ def get_confusion_matrix(results_frame, binary=False, clas=None, save_csv = Fals
         data = np.vstack(tuple(data))
     else:
         raise NotImplementedError('Confusion matrix for multiclass data has not been implemented yet')
+        matrices = list()
+        outer_level = list()
+        inner_level = list()
+        for y_pred, t in zip(pred_matrix.T, thresh):
+            matrices.append(confusion_matrix(y_true, y_pred, labels = classes_names))
+            for c in classes_names:
+                outer_level.append(t)
+                inner_level.append(c)
+            index = pd.MultiIndex.from_arrays([outer_level, inner_level])
+            columns = classes_names
+            data = np.array(matrices).reshape(len(thresh)*4, 4)
     confusion_frame = pd.DataFrame(data, index = index, columns = columns)
     if save_csv:
         filepath = filepath + '/' + filename
