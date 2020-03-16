@@ -134,29 +134,37 @@ class LofarKfoldGenerator(Lofar2ImgGenerator):
         """
 
         if not self._folded:
-            self.x_novelty, self.y_novelty = self._get_windows([self.runs_info[self.novelty_class]], self.novelty_class)
 
-            #Copying to mantain the original data untouched
-            known_runs = deepcopy(self.runs_info)
-            known_classes = deepcopy(self.classes)
-
-            #Windowing the novelty data if it exists
-            if self.novelty:
-                self.x_novelty, self.y_novelty = self._get_windows([self.runs_info[self.novelty_class]], self.novelty_class)
-                known_runs.pop(self.novelty_class)
-                known_classes = np.delete(known_classes, self.novelty_class)
-
-            #Windowing the full known data
+            #Getting the windowed data
             windows, trgts = self._get_windows()
-            self._split = int((len(trgts))/self.folds)
-
-            #Testing if the folds divides without rest
-            if len(trgts)/self.folds != 0:
-                self.plus_1 = True
             
+            #Shuffling the data
+            if shuffle:
+                window_trgt = list(zip(windows, trgts))
+                np.random.shuffle(window_trgt)
+                windows = list()
+                trgts = list()
+                for w, t in window_trgt:
+                    windows.append(w)
+                    trgts.append(t)
+                shuffle = False #To avoid entering the next shuffle unecessarily
+
+            windows = np.array(windows)
+            trgts = np.array(trgts)
+
+            #Dividing into novelty and known data
+            if self.novelty:
+                self.x_novelty = windows[trgts == self.novelty_class]
+                self.y_novelty = np.full((len(self.x_novelty), ), self.novelty_class)
+                windows = windows[trgts != self.novelty_class]
+                trgts = trgts[trgts != self.novelty_class]
+
+            #Creating the folds
+            _split = int((len(trgts))/self.folds)
+
             #Folding the data
             start = 0
-            stop = self._split
+            stop = _split
             self.x_folds = list()
             self.y_folds = list()
 
@@ -165,55 +173,53 @@ class LofarKfoldGenerator(Lofar2ImgGenerator):
                 if verbose:
                     print(f'Splitting fold {fold}')
 
-                if self.plus_1 and (fold == (self.folds-1)):
-                    stop += 1
-
                 self.x_folds.append(windows[start:stop])
-                self.y_folds.append(windows[start:stop])
-            
+                self.y_folds.append(trgts[start:stop])
+
             if verbose:
-                print(f'Previous fold {self.current_fold}')
-                print('The data was folded')
-                print(f'Current fold {test_fold}')
-
-            self.current_fold = test_fold
-            self._folded = True
-
-            #Shuffling the data
-            if shuffle:
-                for fold in range(len(self.y_folds)):
-                    window_trgt = list(zip(self.x_folds[fold], self.y_folds[fold]))
-                    np.random.shuffle(window_trgt)
-                    temp_data = list()
-                    temp_target = list()
-                    for data, target in window_trgt:
-                        temp_data.append(data)
-                        temp_target.append(target)
-                    self.x_folds[fold] = temp_data
-                    self.y_folds[fold] = temp_target
-            
-            #Assining each fold to is correspoding class
-            self.x_test = self.x_folds[test_fold]
-            self.y_test = self.y_folds[test_fold]
-
-            #Copying data for preserving the original and removing the test
-            self.x_fit = deepcopy(self.x_folds)
-            self.x_fit.pop(test_fold)
-            self.y_fit = deepcopy(self.y_folds)
-            self.y_fit.pop(test_fold)
-            self.x_fit = list(np.hstack(tuple(self.x_fit)))
-            self.y_fit = list(np.hstack(tuple(self.y_fit)))
-
-            #Splitting the validation data
-            if validation:
-                self.validation_split(percentage, shuffle)
-            
-            self._folded = True
-
-            gc.collect()
-            
-            print('The data was splitted')
+                print(f'The data as folded into {self.folds} folds.')
         
+        if verbose:
+            print(f'Splitting to fold {test_fold}.')
+
+        #Shuffling the data
+        if shuffle:
+            for fold in range(len(self.y_folds)):
+                window_trgt = list(zip(self.x_folds[fold], self.y_folds[fold]))
+                np.random.shuffle(window_trgt)
+                temp_data = list()
+                temp_target = list()
+                for data, target in window_trgt:
+                    temp_data.append(data)
+                    temp_target.append(target)
+                self.x_folds[fold] = temp_data
+                self.y_folds[fold] = temp_target
+        
+        #Assining each fold to is correspoding class
+        self.x_test = self.x_folds[test_fold]
+        self.y_test = self.y_folds[test_fold]
+
+        #Copying data for preserving the original and removing the test
+        self.x_fit = deepcopy(self.x_folds)
+        self.x_fit.pop(test_fold)
+        self.y_fit = deepcopy(self.y_folds)
+        self.y_fit.pop(test_fold)
+        self.x_fit = list(np.concatenate(tuple(self.x_fit), axis=0))
+        self.y_fit = list(np.concatenate(tuple(self.y_fit), axis=0))
+
+        #Splitting the validation data
+        if validation:
+            self.validation_split(percentage, shuffle)
+        
+        self._folded = True
+        self.current_fold = test_fold
+        
+        if verbose:
+            print('The data was splitted')
+
+        gc.collect()
+
+
 class LofarLeave1OutGenerator(Lofar2ImgGenerator):
     def __init__(self, data, target, freq, runs_info, window_size, stride, novelty = False, novelty_class = None):
         """
