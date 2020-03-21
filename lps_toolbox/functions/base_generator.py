@@ -119,8 +119,8 @@ class Lofar2ImgGenerator():
             The full valid set data,class
         """
 
-        if (not self.x_valid) and (not self.y_valid):
-            warnings.warn('The data was not splitted the valid set is empty')
+        if (type(self.x_valid) == type(None)) or (type(self.y_valid) == type(None)):
+            raise NameError('The valid set is not defined. The data must be splitted first')
 
         x_valid = list()
         y_valid = list()
@@ -160,8 +160,8 @@ class Lofar2ImgGenerator():
             The full train set data,class
         """
 
-        if (not self.x_train) and (not self.y_train):
-            warnings.warn('The data was not splitted the train set is empty')
+        if (type(self.x_train) == type(None)) or (type(self.y_train) == type(None)):
+            raise NameError('The train set is not defined. The data must be splitted first')
         
         x_train = list()
         y_train = list()
@@ -200,8 +200,8 @@ class Lofar2ImgGenerator():
             The full test set data,class
         """
 
-        if (not self.x_test) and (not self.y_test):
-            warnings.warn('The data was not splitted the test set is empty.')
+        if (type(self.x_test) == type(None)) or (type(self.y_test) == type(None)):
+            raise NameError('The test set is not defined. The data must be splitted first')
 
         x_test = list()
         y_test = list()
