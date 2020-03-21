@@ -536,7 +536,7 @@ def class_detection_rate(y_true, pred_matrix, clas):
     """
     y_true = np.where(y_true == clas, 1, 0)
     pred_matrix = np.where(pred_matrix == clas, 1, 0)
-    occurrences = np.sum(y_true)
+    total = len(y_true)
     pred_occurences = np.sum(pred_matrix, axis=0)
-    detection_rate = pred_occurences/occurrences
+    detection_rate = pred_occurences/total
     return detection_rate
