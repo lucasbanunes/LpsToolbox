@@ -36,10 +36,10 @@ class SonarRunsInfo():
         self.class_folders = list(listfolders(self.inputdatapath))
         self.class_folders.sort()
         for class_folder in self.class_folders:
-            run_files = listfiles(self.inputdatapath + '/' + class_folder)
+            run_files = listfiles(os.path.join(self.inputdatapath, class_folder))
             run_files = list(run_files)
             run_names = list(map(lambda x: str(x[:-4]), run_files)) # remove .wav file extension / added list
-            run_paths = list(map(lambda x: self.inputdatapath + '/' + class_folder + '/' + x, run_files)) #added list
+            run_paths = list(map(lambda x: os.path.join(self.inputdatapath, class_folder, x), run_files)) #added list
             run_names.sort()
             run_paths.sort()
             run_indices = list(self._iterClassIndices(run_paths, class_offset, window, overlap, decimation_rate))
